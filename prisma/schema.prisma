@@ -1,8 +1,30 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// =============================================================================
+// ROHI - Restaurant QR Pay Platform
+// Prisma schema
+// =============================================================================
+//
+// DATABASE PROVIDER NOTE (read before changing):
+// - Local dev in this sandbox uses SQLite (file:./db/custom.db) because no
+//   PostgreSQL instance is reachable from here.
+// - The schema below is intentionally PostgreSQL-compatible: no SQLite-only
+//   types or attributes, money stored as integer minor units, standard enums
+//   and relations.
+// - To move to PostgreSQL for pilot/production:
+//       1) datasource.db.provider  -> "postgresql"
+//       2) DATABASE_URL            -> postgres connection string
+//   No other schema changes are required.
+//
+// MONEY RULE (non-negotiable):
+// All monetary values are stored as Int counts of minor units (centavos for
+// MZN; 1 MZN = 100 centavos). NEVER use Float for money anywhere. Int32 max
+// (~2.1e9) safely covers any single bill/payment in MZN centavos. Aggregate
+// reporting should compute on read rather than store cumulative Floats.
+//
+// MULTI-TENANCY RULE:
+// Every domain model carries a `restaurantId` tenant key and an index on it.
+// Every server query MUST scope by restaurantId. Enforced in code, not just
+// schema.
+// =============================================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +35,406 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ────────────────────────────────────────────────────────────────────────────
+// Enums
+// ────────────────────────────────────────────────────────────────────────────
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  SERVER
+  CASHIER
 }
 
-model Post {
+enum PlatformRole {
+  NONE
+  ADMIN
+  SUPPORT
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+enum BillSource {
+  POS
+  MANUAL
+  NATIVE
+}
+
+enum BillStatus {
+  OPEN
+  PENDING_PAYMENT
+  PAID
+  VOIDED
+  EXPIRED
+}
+
+enum PaymentProviderCode {
+  MPESA
+  EMOLA
+  CARD
+  MOCK
+}
+
+enum PaymentStatus {
+  PENDING
+  INITIATED
+  AUTHORIZED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PosAdapterCode {
+  NONE
+  GENERIC_REST
+  MOCK
+}
+
+enum PosSyncDirection {
+  BILL_FETCH
+  PAYMENT_CONFIRM
+}
+
+enum PosSyncStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  RETRYING
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Identity & Multi-tenancy
+// ────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String       @id @default(cuid())
+  email           String       @unique
+  name            String?
+  // NextAuth credentials provider stores the password hash here (bcrypt/argon2).
+  passwordHash    String?
+  platformRole    PlatformRole @default(NONE)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  memberships RestaurantStaff[]
+  accounts    Account[]
+  sessions    Session[]
+  auditLogs   AuditLog[] @relation("AuditActorUser")
+
+  @@index([email])
+}
+
+// Membership join: a User may belong to multiple Restaurants (supports ROHI
+// platform admins and chain operators). Unique on (userId, restaurantId).
+model RestaurantStaff {
+  id           String    @id @default(cuid())
+  userId       String
+  restaurantId String
+  role         StaffRole @default(SERVER)
+  createdAt    DateTime  @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, restaurantId])
+  @@index([restaurantId])
+}
+
+model Restaurant {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  name      String
+  legalName String?
+  taxId     String? // NUIT (Mozambique tax number)
+  currency  String   @default("MZN") // ISO 4217
+  locale    String   @default("pt-MZ") // default UI locale for this tenant
+  timezone  String   @default("Africa/Maputo")
+  status    String   @default("active") // active | suspended | inactive
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tables       RestaurantTable[]
+  bills        Bill[]
+  payments     Payment[]
+  staff        RestaurantStaff[]
+  posConnection PosConnection?
+  auditLogs    AuditLog[]
+
+  @@index([status])
+}
+
+// NextAuth adapter models (v4). Included now so Task 2 (auth) needs no
+// additional migration.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tables & QR
+// ────────────────────────────────────────────────────────────────────────────
+
+model RestaurantTable {
+  id           String      @id @default(cuid())
+  restaurantId String
+  label        String // "Mesa 5"
+  area         String? // "Terrace", "Indoor"
+  // Opaque, unguessable token encoded in the QR code URL (/pay?table=<token>).
+  // NEVER contains bill data, amount, or any authorization. The backend
+  // resolves token -> table -> restaurant -> active bill on every request.
+  token        String      @unique
+  status       TableStatus @default(AVAILABLE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  bills      Bill[]     @relation("TableBills")
+
+  // Active bill is resolved by query (Bill where tableId + status in
+  // [OPEN, PENDING_PAYMENT]) rather than a stored pointer, to avoid sync bugs.
+  @@index([restaurantId, status])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Canonical Billing Engine (shared by POS / manual / native sources)
+// ────────────────────────────────────────────────────────────────────────────
+
+model Bill {
+  id                String     @id @default(cuid())
+  restaurantId      String // tenant key (denormalized for scoping)
+  tableId           String?
+  source            BillSource
+  status            BillStatus @default(OPEN)
+  externalPosBillId String? // POS-sourced bills: the POS's own bill id
+
+  // Money: integer minor units (centavos for MZN). NEVER Float.
+  subtotalMinor        Int @default(0)
+  adjustmentTotalMinor Int @default(0) // net: discounts negative, surcharges positive
+  totalMinor           Int @default(0) // subtotal + adjustmentTotal (recomputed on every mutation)
+
+  currency String
+  openedAt DateTime @default(now())
+  closedAt DateTime?
+  voidedAt DateTime?
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      RestaurantTable?    @relation("TableBills", fields: [tableId], references: [id])
+  items      BillItem[]
+  adjustments BillAdjustment[]
+  payments   Payment[]
+  posSyncRecords PosSyncRecord[]
+
+  @@index([restaurantId, status])
+  @@index([tableId, status])
+  @@index([source, status])
+}
+
+model BillItem {
+  id             String   @id @default(cuid())
+  billId         String
+  name           String
+  quantity       Int      @default(1)
+  unitPriceMinor Int // minor units
+  totalMinor     Int // quantity * unitPriceMinor, computed server-side
+  posExternalId  String? // POS line item id, if POS-sourced
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+}
+
+model BillAdjustment {
+  id          String   @id @default(cuid())
+  billId      String
+  type        String // DISCOUNT | SURCHARGE | SERVICE | TAX
+  label       String
+  amountMinor Int // negative for discounts
+  createdAt   DateTime @default(now())
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Payments (status machine independent of POS sync)
+// ────────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id               String               @id @default(cuid())
+  restaurantId     String // tenant key (denormalized)
+  billId           String
+  providerCode     PaymentProviderCode
+  // Provider transaction reference (e.g., M-Pesa conversation/transaction id).
+  providerPaymentId String?
+  status           PaymentStatus        @default(PENDING)
+  amountMinor      Int
+  currency         String
+  // Idempotency: prevents duplicate processing of the same logical intent.
+  idempotencyKey   String @unique
+  // Masked customer identifier (e.g., MSISDN last 4). Never store full PII.
+  customerIdentifier String?
+  initiatedAt      DateTime?
+  confirmedAt      DateTime?
+  failedReason     String?
+  // Raw last provider payload (webhook + verification response) for audit/debug.
+  rawProviderPayload String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  bill       Bill           @relation(fields: [billId], references: [id], onDelete: Restrict)
+  restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  events     PaymentEvent[]
+
+  @@index([billId, status])
+  @@index([restaurantId, status])
+  @@index([providerCode, status])
+  @@index([providerPaymentId])
+}
+
+// Append-only payment state log: every transition + every webhook received.
+model PaymentEvent {
+  id         String   @id @default(cuid())
+  paymentId  String
+  eventType  String // "initiated" | "webhook.received" | "verified" | "failed" | ...
+  statusFrom String?
+  statusTo   String?
+  payload    String? // JSON string
+  createdAt  DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([createdAt])
+}
+
+// Idempotent webhook ingestion: dedupes provider redeliveries so a repeated
+// M-Pesa callback cannot double-process.
+model WebhookReceipt {
+  id              String               @id @default(cuid())
+  providerCode    PaymentProviderCode
+  providerEventId String // unique per provider event
+  payload         String
+  processedStatus String   @default("PENDING") // PENDING | PROCESSED | IGNORED | ERROR
+  processedAt     DateTime?
+  receivedAt      DateTime @default(now())
+
+  @@unique([providerCode, providerEventId])
+  @@index([processedStatus])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// POS integration (separate state machine from payment status)
+// ────────────────────────────────────────────────────────────────────────────
+
+model PosConnection {
+  id              String         @id @default(cuid())
+  restaurantId    String         @unique // one active POS connection per restaurant for MVP
+  adapterCode     PosAdapterCode @default(NONE)
+  // Encrypted JSON blob of adapter-specific credentials. NEVER plaintext, NEVER
+  // logged, NEVER returned to the client.
+  configEncrypted String?
+  status          String         @default("ACTIVE") // ACTIVE | INACTIVE | ERROR
+  lastError       String?
+  lastSyncAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([adapterCode, status])
+}
+
+// Durable, retryable POS sync attempts. Independent of Payment.status: a
+// payment can be SUCCEEDED while its confirm-sync is RETRYING/FAILED.
+model PosSyncRecord {
+  id                 String           @id @default(cuid())
+  restaurantId       String
+  billId             String
+  adapterCode        PosAdapterCode
+  direction          PosSyncDirection
+  status             PosSyncStatus    @default(PENDING)
+  attempts           Int              @default(0)
+  maxAttempts        Int              @default(5)
+  lastError          String?
+  externalResourceId String?
+  lastAttemptAt      DateTime?
+  nextAttemptAt      DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId, status])
+  @@index([status, nextAttemptAt])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Audit log (append-only: no updates, no deletes in app code)
+// ────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorType    String // USER | GUEST | SYSTEM | PROVIDER_WEBHOOK
+  actorId      String?
+  userId       String?
+  restaurantId String?
+  action       String // "bill.opened" | "payment.succeeded" | "pos.sync.retried" | ...
+  targetType   String?
+  targetId     String?
+  metadata     String? // JSON string
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  user       User?         @relation("AuditActorUser", fields: [userId], references: [id], onDelete: SetNull)
+  restaurant Restaurant?   @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@index([action, createdAt])
+  @@index([userId])
 }
