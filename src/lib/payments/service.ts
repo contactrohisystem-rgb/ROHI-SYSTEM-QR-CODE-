@@ -3,6 +3,7 @@ import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { getProvider } from "./registry";
 import { BillingError } from "@/lib/billing";
+import { enqueuePaymentConfirmation } from "@/lib/pos/service";
 
 export class PaymentError extends Error {
   constructor(public code: string) {
@@ -278,6 +279,18 @@ export async function confirmMockPayment(params: {
     where: { id: payment.id },
     select: { status: true },
   });
+
+  // After a successful payment, enqueue a POS confirmation sync (only affects
+  // POS-sourced bills with a configured POS). Best-effort and isolated — a
+  // POS sync failure must NEVER fail the payment result. A successful payment
+  // stays successful even if the POS is temporarily unavailable.
+  if (updated?.status === PaymentStatus.SUCCEEDED) {
+    await enqueuePaymentConfirmation(payment.billId).catch(() => {
+      // Enqueue/processing errors are persisted on the PosSyncRecord; the
+      // payment itself remains SUCCEEDED.
+    });
+  }
+
   return { status: updated?.status ?? PaymentStatus.PENDING };
 }
 

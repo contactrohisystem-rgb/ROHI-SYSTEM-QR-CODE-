@@ -7,6 +7,7 @@ import { SignInForm } from "@/components/auth/sign-in-form";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { TablesSection } from "@/components/tables/tables-section";
 import type { TableQrView } from "@/components/tables/table-card";
+import { PosSection } from "@/components/pos/pos-section";
 import {
   Card,
   CardDescription,
@@ -97,10 +98,21 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4">
+      <section className="mx-auto w-full max-w-6xl flex-1 space-y-8 p-4">
         {hasRestaurant ? (
-          <TablesSection tables={tables} canManage={canManage} />
-        ) : (
+          <>
+            <TablesSection tables={tables} canManage={canManage} />
+            {canManage && (
+              <PosSection
+                tables={tables.map((t) => ({
+                  id: t.id,
+                  label: t.label,
+                  hasOpenBill: !!t.activeBill,
+                }))}
+              />
+            )}
+          </>
+            ) : (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
