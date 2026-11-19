@@ -1,0 +1,14 @@
+{
+  "GuestPay": {
+    "title": "ROHI",
+    "subtitle": "Pagamento rápido por QR",
+    "invalidTitle": "Código inválido",
+    "invalidDescription": "Este código de mesa não é válido ou não existe. Peça ajuda a um empregado.",
+    "restaurant": "Restaurante",
+    "table": "Mesa",
+    "noActiveBill": "Sem conta activa",
+    "noActiveBillDescription": "Não há conta aberta para esta mesa neste momento. O empregado irá abrir a conta em breve.",
+    "refresh": "Actualizar",
+    "poweredBy": "Pagamento seguro por ROHI"
+  }
+}
