@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { getProvider } from "./registry";
+import type { VerifyPaymentResult } from "./provider";
 import { BillingError } from "@/lib/billing";
 import { enqueuePaymentConfirmation } from "@/lib/pos/service";
 
@@ -223,17 +224,38 @@ export async function confirmMockPayment(params: {
   // hold a DB lock during a network call in the real provider).
   const verification = await provider.verifyPayment(payment.providerPaymentId);
 
-  // Transition atomically; re-read to handle concurrent confirmations.
+  // Transition via the shared helper (used by both the webhook path and the
+  // reconciliation worker). It handles the atomic transition, the bill→PAID
+  // update, the PaymentEvent, and the best-effort POS sync enqueue.
+  const finalStatus = await transitionPaymentFromVerification(
+    payment.id,
+    verification,
+  );
+  return { status: finalStatus };
+}
+
+/**
+ * Shared payment transition: apply an authoritative verification result to a
+ * payment. Atomically transitions payment status, records a PaymentEvent, and
+ * (on success) sets the bill to PAID. After commit, enqueues a POS
+ * confirmation sync (best-effort, isolated). Idempotent: a payment already
+ * SUCCEEDED is left as-is. Used by confirmMockPayment (webhook path) and
+ * reconcilePayments (worker).
+ */
+export async function transitionPaymentFromVerification(
+  paymentId: string,
+  verification: VerifyPaymentResult,
+): Promise<PaymentStatus> {
   await db.$transaction(async (tx) => {
     const current = await tx.payment.findUnique({
-      where: { id: payment.id },
-      select: { status: true },
+      where: { id: paymentId },
+      select: { status: true, billId: true },
     });
     if (!current || current.status === PaymentStatus.SUCCEEDED) return;
 
     if (verification.status === PaymentStatus.SUCCEEDED) {
       await tx.payment.update({
-        where: { id: payment.id },
+        where: { id: paymentId },
         data: {
           status: PaymentStatus.SUCCEEDED,
           confirmedAt: new Date(),
@@ -242,7 +264,7 @@ export async function confirmMockPayment(params: {
       });
       await tx.paymentEvent.create({
         data: {
-          paymentId: payment.id,
+          paymentId,
           eventType: "verified",
           statusFrom: current.status,
           statusTo: "SUCCEEDED",
@@ -251,12 +273,12 @@ export async function confirmMockPayment(params: {
       });
       // The PAYMENT ENGINE sets the bill to PAID — never the billing module.
       await tx.bill.update({
-        where: { id: payment.billId },
+        where: { id: current.billId },
         data: { status: "PAID", closedAt: new Date() },
       });
     } else if (verification.status === PaymentStatus.FAILED) {
       await tx.payment.update({
-        where: { id: payment.id },
+        where: { id: paymentId },
         data: {
           status: PaymentStatus.FAILED,
           failedReason: "provider_verify_failed",
@@ -265,7 +287,7 @@ export async function confirmMockPayment(params: {
       });
       await tx.paymentEvent.create({
         data: {
-          paymentId: payment.id,
+          paymentId,
           eventType: "failed",
           statusFrom: current.status,
           statusTo: "FAILED",
@@ -273,25 +295,24 @@ export async function confirmMockPayment(params: {
         },
       });
     }
+    // PENDING: leave as-is (still in flight).
   });
 
   const updated = await db.payment.findUnique({
-    where: { id: payment.id },
-    select: { status: true },
+    where: { id: paymentId },
+    select: { status: true, billId: true },
   });
 
   // After a successful payment, enqueue a POS confirmation sync (only affects
   // POS-sourced bills with a configured POS). Best-effort and isolated — a
-  // POS sync failure must NEVER fail the payment result. A successful payment
-  // stays successful even if the POS is temporarily unavailable.
+  // POS sync failure must NEVER fail the payment result.
   if (updated?.status === PaymentStatus.SUCCEEDED) {
-    await enqueuePaymentConfirmation(payment.billId).catch(() => {
-      // Enqueue/processing errors are persisted on the PosSyncRecord; the
-      // payment itself remains SUCCEEDED.
+    await enqueuePaymentConfirmation(updated.billId).catch(() => {
+      // POS sync failures are isolated from the payment result.
     });
   }
 
-  return { status: updated?.status ?? PaymentStatus.PENDING };
+  return updated?.status ?? PaymentStatus.PENDING;
 }
 
 // Re-export so callers don't need to import BillingError from billing.

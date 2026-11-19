@@ -89,6 +89,12 @@ function formatDateTime(iso: string | null): string {
   });
 }
 
+function ago(ms: number): string {
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 60) return `há ${s}s`;
+  return `há ${Math.floor(s / 60)}m`;
+}
+
 /**
  * POS dashboard section. Shows the restaurant's POS connection, recent sync
  * records (with retry state), and demo controls (enable mock POS, simulate a
@@ -100,6 +106,14 @@ export function PosSection({ tables }: { tables: TableView[] }) {
   const [connection, setConnection] = useState<PosConnectionView | null>(null);
   const [records, setRecords] = useState<SyncRecordView[]>([]);
   const [simFailure, setSimFailure] = useState(false);
+  const [workerStatus, setWorkerStatus] = useState<{
+    at: number;
+    syncsAttempted: number;
+    paymentsReconciled: number;
+    cumulativeSyncs: number;
+    cumulativeReconciled: number;
+    error?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [processLoading, setProcessLoading] = useState(false);
   const [enableLoading, setEnableLoading] = useState(false);
@@ -119,6 +133,12 @@ export function PosSection({ tables }: { tables: TableView[] }) {
       setConnection(c.connection ?? null);
       setRecords(r.records ?? []);
       setSimFailure(f.simulatedFailure ?? false);
+      // Worker status is fetched separately so its failure doesn't break the
+      // rest of the section.
+      fetch("/api/worker/status")
+        .then((x) => x.json())
+        .then((d) => setWorkerStatus(d.lastTick ?? null))
+        .catch(() => {});
     } finally {
       setLoading(false);
     }
@@ -260,6 +280,23 @@ export function PosSection({ tables }: { tables: TableView[] }) {
             </p>
           </CardContent>
         )}
+      </Card>
+
+      {/* Worker status (background retries + reconciliation) */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <RotateCw className="h-4 w-4" />
+              Worker de fundo
+            </CardTitle>
+            <CardDescription>
+              {workerStatus
+                ? `Último tick ${ago(workerStatus.at)} · total: ${workerStatus.cumulativeSyncs} sincronização(ões), ${workerStatus.cumulativeReconciled} reconciliação(ões)${workerStatus.error ? ` · erro: ${workerStatus.error}` : ""}`
+                : "A iniciar — o primeiro tick corre em ~5s."}
+            </CardDescription>
+          </div>
+        </CardHeader>
       </Card>
 
       {/* Sync records */}

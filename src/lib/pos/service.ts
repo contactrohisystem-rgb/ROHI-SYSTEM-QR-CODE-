@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { PosAdapterCode, PosSyncDirection, PosSyncStatus } from "@prisma/client";
+import { PosAdapterCode } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { getAdapter } from "./registry";
 import { recomputeBillTotals } from "@/lib/billing";
