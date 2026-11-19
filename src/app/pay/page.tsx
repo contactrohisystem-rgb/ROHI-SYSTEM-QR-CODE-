@@ -1,8 +1,14 @@
 import { db } from "@/lib/db";
-import { getLocale, getTranslations } from "next-intl/server";
+import {
+  getLocale,
+  getMessages,
+  getTranslations,
+} from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
 import { LangToggle } from "@/components/lang-toggle";
 import { getActiveBillForTable } from "@/lib/billing";
 import { formatMoney } from "@/lib/money";
+import { CheckoutPanel } from "@/components/payments/checkout-panel";
 import {
   Card,
   CardContent,
@@ -10,18 +16,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { QrCode, Store, Utensils } from "lucide-react";
+import { CheckCircle2, QrCode, Store, Utensils } from "lucide-react";
 
 export const metadata = { title: "ROHI — Pagamento" };
+
+// A bill is considered "recently paid" (and shown as a confirmation card on
+// reload) if it was paid within this window. Lets the guest see a success
+// state if they refresh right after paying.
+const RECENT_PAID_WINDOW_MS = 30 * 60 * 1000;
 
 /**
  * Guest payment entry point.
  *
- * The QR code on the restaurant table encodes only this URL with an opaque
- * table token: /pay?table=tbl_<hex>. The backend resolves token -> table ->
- * restaurant -> active bill server-side. PT/EN via next-intl.
+ * The QR encodes only /pay?table=<opaque token>. The backend resolves token ->
+ * table -> restaurant -> active bill server-side. The guest never receives a
+ * billId or paymentId they could use without the token.
  */
 export default async function PayPage({
   searchParams,
@@ -31,6 +41,7 @@ export default async function PayPage({
   const t = await getTranslations("GuestPay");
   const locale = await getLocale();
   const moneyLocale = locale === "en" ? "en" : "pt";
+  const messages = await getMessages();
   const { table: token } = await searchParams;
 
   const table = token
@@ -44,9 +55,29 @@ export default async function PayPage({
 
   const invalid = !table || table.restaurant.status !== "active";
 
-  // Resolve the active (OPEN) bill for this table, if any.
+  // Active (OPEN) bill for the table.
   const activeBill =
     table && !invalid ? await getActiveBillForTable(table.id) : null;
+
+  // If no active bill, look for a recently-PAID bill so a post-payment reload
+  // shows a confirmation instead of an abrupt "no active bill".
+  let recentPaidBill: {
+    id: string;
+    totalMinor: number;
+    currency: string;
+    closedAt: Date;
+  } | null = null;
+  if (table && !invalid && !activeBill) {
+    recentPaidBill = await db.bill.findFirst({
+      where: {
+        tableId: table.id,
+        status: "PAID",
+        closedAt: { gte: new Date(Date.now() - RECENT_PAID_WINDOW_MS) },
+      },
+      orderBy: { closedAt: "desc" },
+      select: { id: true, totalMinor: true, currency: true, closedAt: true },
+    });
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-background">
@@ -69,6 +100,7 @@ export default async function PayPage({
           </Card>
         ) : (
           <>
+            {/* Restaurant + table identification */}
             <Card>
               <CardHeader className="space-y-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -96,66 +128,38 @@ export default async function PayPage({
             </Card>
 
             {activeBill ? (
-              <Card className="flex-1">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <span>{t("bill")}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {activeBill.items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("noItems")}
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {activeBill.items.map((it) => (
-                        <div
-                          key={it.id}
-                          className="flex items-start justify-between gap-2 text-sm"
-                        >
-                          <div className="min-w-0">
-                            <span className="font-medium">{it.name}</span>
-                            <span className="ml-1 text-muted-foreground">
-                              {it.quantity} ×{" "}
-                              {formatMoney(
-                                it.unitPriceMinor,
-                                activeBill.currency,
-                                moneyLocale,
-                              )}
-                            </span>
-                          </div>
-                          <span className="font-medium">
-                            {formatMoney(
-                              it.totalMinor,
-                              activeBill.currency,
-                              moneyLocale,
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeBill.adjustments.length > 0 && (
-                    <>
-                      <Separator />
-                      <div className="space-y-1">
-                        {activeBill.adjustments.map((a) => (
+              <>
+                {/* Read-only bill breakdown */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">{t("bill")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {activeBill.items.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t("noItems")}
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {activeBill.items.map((it) => (
                           <div
-                            key={a.id}
-                            className="flex justify-between text-sm"
+                            key={it.id}
+                            className="flex items-start justify-between gap-2 text-sm"
                           >
-                            <span className="text-muted-foreground">
-                              {a.label}
-                            </span>
-                            <span
-                              className={
-                                a.amountMinor < 0 ? "text-destructive" : ""
-                              }
-                            >
+                            <div className="min-w-0">
+                              <span className="font-medium">{it.name}</span>
+                              <span className="ml-1 text-muted-foreground">
+                                {it.quantity} ×{" "}
+                                {formatMoney(
+                                  it.unitPriceMinor,
+                                  activeBill.currency,
+                                  moneyLocale,
+                                )}
+                              </span>
+                            </div>
+                            <span className="font-medium">
                               {formatMoney(
-                                a.amountMinor,
+                                it.totalMinor,
                                 activeBill.currency,
                                 moneyLocale,
                               )}
@@ -163,57 +167,113 @@ export default async function PayPage({
                           </div>
                         ))}
                       </div>
-                    </>
-                  )}
+                    )}
 
-                  <Separator />
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {t("subtotal")}
-                      </span>
-                      <span>
-                        {formatMoney(
-                          activeBill.subtotalMinor,
-                          activeBill.currency,
-                          moneyLocale,
-                        )}
-                      </span>
-                    </div>
-                    {activeBill.adjustmentTotalMinor !== 0 && (
+                    {activeBill.adjustments.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="space-y-1">
+                          {activeBill.adjustments.map((a) => (
+                            <div
+                              key={a.id}
+                              className="flex justify-between text-sm"
+                            >
+                              <span className="text-muted-foreground">
+                                {a.label}
+                              </span>
+                              <span
+                                className={
+                                  a.amountMinor < 0 ? "text-destructive" : ""
+                                }
+                              >
+                                {formatMoney(
+                                  a.amountMinor,
+                                  activeBill.currency,
+                                  moneyLocale,
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    <Separator />
+                    <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">
-                          {t("adjustments")}
+                          {t("subtotal")}
                         </span>
                         <span>
                           {formatMoney(
-                            activeBill.adjustmentTotalMinor,
+                            activeBill.subtotalMinor,
                             activeBill.currency,
                             moneyLocale,
                           )}
                         </span>
                       </div>
-                    )}
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between text-lg font-semibold">
-                    <span>{t("total")}</span>
-                    <span>
-                      {formatMoney(
-                        activeBill.totalMinor,
-                        activeBill.currency,
-                        moneyLocale,
+                      {activeBill.adjustmentTotalMinor !== 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {t("adjustments")}
+                          </span>
+                          <span>
+                            {formatMoney(
+                              activeBill.adjustmentTotalMinor,
+                              activeBill.currency,
+                              moneyLocale,
+                            )}
+                          </span>
+                        </div>
                       )}
-                    </span>
-                  </div>
+                      <div className="flex justify-between text-base font-semibold">
+                        <span>{t("total")}</span>
+                        <span>
+                          {formatMoney(
+                            activeBill.totalMinor,
+                            activeBill.currency,
+                            moneyLocale,
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Pay button is disabled until the payment engine lands
-                      (Task 6). This sets up the visual checkout affordance. */}
-                  <Button className="w-full" disabled>
-                    {t("pay")}
-                  </Button>
-                  <p className="text-center text-xs text-muted-foreground">
-                    {t("payDisabledNote")}
+                {/* Interactive checkout (client) */}
+                <NextIntlClientProvider locale={locale} messages={messages}>
+                  <CheckoutPanel
+                    tableToken={token!}
+                    bill={{
+                      id: activeBill.id,
+                      totalMinor: activeBill.totalMinor,
+                      currency: activeBill.currency,
+                    }}
+                    locale={moneyLocale as "pt" | "en"}
+                  />
+                </NextIntlClientProvider>
+              </>
+            ) : recentPaidBill ? (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+                  <CheckCircle2 className="h-12 w-12 text-green-600" />
+                  <p className="text-base font-semibold">{t("success")}</p>
+                  <div className="w-full rounded-md border bg-muted/40 px-3 py-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {t("paidAmount")}
+                      </span>
+                      <span className="font-semibold">
+                        {formatMoney(
+                          recentPaidBill.totalMinor,
+                          recentPaidBill.currency,
+                          moneyLocale,
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="max-w-xs text-xs text-muted-foreground">
+                    {t("successNote")}
                   </p>
                 </CardContent>
               </Card>

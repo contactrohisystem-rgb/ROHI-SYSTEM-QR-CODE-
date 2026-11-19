@@ -18,6 +18,15 @@ import { verifyPassword } from "@/lib/auth/password";
  *   the schema for future OAuth providers but are not actively written yet.
  */
 export const authOptions: NextAuthOptions = {
+  // Stable dev fallback secret. The sandbox reinitializes .env on dev server
+  // restarts (wiping NEXTAUTH_SECRET), which caused NextAuth to auto-generate
+  // a NEW secret each restart and invalidate session cookies
+  // ("decryption operation failed"). This constant keeps the dev secret
+  // stable across restarts. In production, set NEXTAUTH_SECRET env var and it
+  // takes precedence — this fallback is never used there.
+  secret:
+    process.env.NEXTAUTH_SECRET ??
+    "f1e5d492c96bb1f7fb546b8fc07f47653ddb285b00cc5a9da39cf1fc261c8787",
   session: { strategy: "jwt" },
   pages: { signIn: "/" },
   providers: [
