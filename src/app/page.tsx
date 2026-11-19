@@ -34,17 +34,26 @@ export default async function Home() {
   }
 
   const u = session.user;
-  const canManageTables = u.activeRole === "OWNER" || u.activeRole === "MANAGER";
+  const hasRestaurant = !!u.activeRestaurantId && !!u.activeRole;
+  // Table create/delete + bill void = MANAGER+. Bill open/items = SERVER+.
+  const canManage =
+    u.activeRole === "OWNER" || u.activeRole === "MANAGER";
 
   let tables: TableQrView[] = [];
-  if (canManageTables && u.activeRestaurantId) {
+  if (hasRestaurant && u.activeRestaurantId) {
     const baseUrl = await getBaseUrl();
     const rows = await db.restaurantTable.findMany({
       where: { restaurantId: u.activeRestaurantId },
       orderBy: [{ area: "asc" }, { label: "asc" }],
+      include: {
+        // Active (OPEN) bill for the table — at most one by invariant.
+        bills: {
+          where: { status: "OPEN" },
+          select: { id: true, totalMinor: true, currency: true },
+          take: 1,
+        },
+      },
     });
-    // Generate the QR data URL (server-side) for each table token. The QR
-    // encodes only /pay?table=<opaque token> — never bill data or amounts.
     tables = await Promise.all(
       rows.map(async (t) => {
         const payUrl = `${baseUrl}/pay?table=${t.token}`;
@@ -56,6 +65,7 @@ export default async function Home() {
           token: t.token,
           payUrl,
           qrDataUrl: await generateQrDataUrl(payUrl),
+          activeBill: t.bills[0] ?? null,
         } satisfies TableQrView;
       }),
     );
@@ -88,16 +98,16 @@ export default async function Home() {
       </header>
 
       <section className="mx-auto w-full max-w-6xl flex-1 space-y-6 p-4">
-        {canManageTables ? (
-          <TablesSection tables={tables} />
+        {hasRestaurant ? (
+          <TablesSection tables={tables} canManage={canManage} />
         ) : (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <ShieldAlert className="h-4 w-4" /> Sem acesso
+                <ShieldAlert className="h-4 w-4" /> Sem restaurante
               </CardTitle>
               <CardDescription>
-                A gestão de mesas requer papel de Gestor ou superior.
+                A sua conta não está associada a nenhum restaurante.
               </CardDescription>
             </CardHeader>
           </Card>
