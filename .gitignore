@@ -33,6 +33,14 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# database (runtime data — never commit)
+*.db
+db/*.db
+*.db-journal
+
+# runtime/environment state
+.zscripts/
+
 # vercel
 .vercel
 

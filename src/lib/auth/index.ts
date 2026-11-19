@@ -18,6 +18,11 @@ import { verifyPassword } from "@/lib/auth/password";
  *   the schema for future OAuth providers but are not actively written yet.
  */
 export const authOptions: NextAuthOptions = {
+  // Trust the request's Host header. Required when running behind a reverse
+  // proxy / gateway (the preview panel proxies localhost:3000 through an
+  // HTTPS gateway). Without this, NextAuth may not recognise the gateway's
+  // host and the session cookie/callback won't work for preview users.
+  trustHost: true,
   // Stable dev fallback secret. The sandbox reinitializes .env on dev server
   // restarts (wiping NEXTAUTH_SECRET), which caused NextAuth to auto-generate
   // a NEW secret each restart and invalidate session cookies
