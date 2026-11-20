@@ -1,5 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 
@@ -56,36 +57,64 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // On initial sign-in, `user` is populated. Enrich the token with the
-      // tenant context we need for authorization on every subsequent request.
+      const userId = user?.id ?? token.userId;
+      if (!userId) return token;
+      // On sign-in, set the immutable identity fields.
       if (user?.id) {
         token.userId = user.id;
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
-          select: {
-            platformRole: true,
-            memberships: {
-              include: {
-                restaurant: { select: { id: true, name: true, status: true } },
-              },
-              orderBy: { createdAt: "asc" },
+          select: { platformRole: true },
+        });
+        token.platformRole = dbUser?.platformRole ?? "NONE";
+      }
+      // Active restaurant: read the switch cookie (set by the switcher) and
+      // validate the user's membership; fall back to the first active
+      // membership. This runs on every request so switching is instant.
+      const cookieStore = await cookies();
+      const switchId = cookieStore.get("ROHI_ACTIVE_REST")?.value;
+      const memberships = await db.restaurantStaff.findMany({
+        where: { userId },
+        include: {
+          restaurant: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              brandPrimary: true,
+              brandSecondary: true,
+              brandAccent: true,
+              logoUrl: true,
+              appearance: true,
             },
           },
-        });
-        if (dbUser) {
-          token.platformRole = dbUser.platformRole;
-          // Default active restaurant = first active membership. Multi-restaurant
-          // users will get a switcher in a later task.
-          const firstActive = dbUser.memberships.find(
-            (m) => m.restaurant.status === "active",
-          );
-          if (firstActive) {
-            token.activeRestaurantId = firstActive.restaurantId;
-            token.activeRestaurantName = firstActive.restaurant.name;
-            token.activeRole = firstActive.role;
-          }
-        }
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      const activeM = switchId
+        ? memberships.find(
+            (m) => m.restaurantId === switchId && m.restaurant.status === "active",
+          )
+        : null;
+      const chosen =
+        activeM ?? memberships.find((m) => m.restaurant.status === "active");
+      if (chosen) {
+        token.activeRestaurantId = chosen.restaurantId;
+        token.activeRestaurantName = chosen.restaurant.name;
+        token.activeRole = chosen.role;
+        token.activeBrand = {
+          primary: chosen.restaurant.brandPrimary ?? undefined,
+          secondary: chosen.restaurant.brandSecondary ?? undefined,
+          accent: chosen.restaurant.brandAccent ?? undefined,
+          logoUrl: chosen.restaurant.logoUrl ?? undefined,
+          appearance: chosen.restaurant.appearance ?? "dark",
+        };
       }
+      token.memberships = memberships.map((m) => ({
+        id: m.restaurantId,
+        name: m.restaurant.name,
+        role: m.role,
+      }));
       return token;
     },
     async session({ session, token }) {
@@ -95,6 +124,8 @@ export const authOptions: NextAuthOptions = {
         session.user.activeRestaurantId = token.activeRestaurantId;
         session.user.activeRestaurantName = token.activeRestaurantName;
         session.user.activeRole = token.activeRole;
+        session.user.activeBrand = token.activeBrand;
+        session.user.memberships = token.memberships;
       }
       return session;
     },

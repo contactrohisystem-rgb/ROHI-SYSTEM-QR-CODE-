@@ -9,6 +9,7 @@ import { LangToggle } from "@/components/lang-toggle";
 import { getActiveBillForTable } from "@/lib/billing";
 import { formatMoney } from "@/lib/money";
 import { CheckoutPanel } from "@/components/payments/checkout-panel";
+import { brandCssVars } from "@/lib/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle2, QrCode, Store, Utensils } from "lucide-react";
@@ -39,7 +40,16 @@ export default async function PayPage({
     ? await db.restaurantTable.findUnique({
         where: { token },
         include: {
-          restaurant: { select: { id: true, name: true, status: true } },
+          restaurant: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              brandPrimary: true,
+              brandAccent: true,
+              logoUrl: true,
+            },
+          },
         },
       })
     : null;
@@ -67,16 +77,34 @@ export default async function PayPage({
     });
   }
 
+  const brandVars = table
+    ? brandCssVars({
+        primary: table.restaurant.brandPrimary ?? undefined,
+        accent: table.restaurant.brandAccent ?? undefined,
+      })
+    : {};
+
   return (
-    <main className="theme-light flex min-h-screen flex-col bg-background">
+    <main
+      className="theme-light flex min-h-screen flex-col bg-background"
+      style={brandVars}
+    >
       <header className="sticky top-0 z-10 border-b border-border/60 bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-              <span className="text-[10px] font-bold text-primary-foreground">
-                R
-              </span>
-            </div>
+            {table?.restaurant.logoUrl ? (
+              <img
+                src={table.restaurant.logoUrl}
+                alt=""
+                className="h-7 w-7 rounded-md object-cover"
+              />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+                <span className="text-[10px] font-bold text-primary-foreground">
+                  R
+                </span>
+              </div>
+            )}
             <span className="text-sm font-semibold tracking-tight">
               {t("title")}
             </span>

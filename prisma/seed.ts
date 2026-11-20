@@ -261,7 +261,91 @@ async function main() {
     });
   }
 
+  // --- Second demo restaurant (different branding) for multi-restaurant demo ---
+  const RESTAURANT_2_ID = "cafe-costa-do-sol";
+  const r2 = await db.restaurant.upsert({
+    where: { id: RESTAURANT_2_ID },
+    update: {},
+    create: {
+      id: RESTAURANT_2_ID,
+      name: "Café Costa do Sol",
+      legalName: "Costa do Sol Lda",
+      currency: "MZN",
+      locale: "pt-MZ",
+      timezone: "Africa/Maputo",
+      status: "active",
+      phone: "+258 841234567",
+      address: "Av. Marginal, Maputo",
+      // Different branding: warm orange primary, light staff appearance, a logo.
+      brandPrimary: "#ea580c",
+      brandSecondary: "#f59e0b",
+      brandAccent: "#0ea5e9",
+      appearance: "light",
+      logoUrl:
+        "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=128&h=128&fit=crop&q=80",
+      coverUrl:
+        "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800&h=300&fit=crop&q=80",
+    },
+  });
+  // Owner belongs to BOTH restaurants (demonstrates multi-restaurant switching).
+  await db.restaurantStaff.upsert({
+    where: { userId_restaurantId: { userId: OWNER_ID, restaurantId: RESTAURANT_2_ID } },
+    update: {},
+    create: { userId: OWNER_ID, restaurantId: RESTAURANT_2_ID, role: "OWNER" },
+  });
+  // Second restaurant's floor plan (3 tables, different layout).
+  await db.posSyncRecord.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  await db.payment.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  await db.bill.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  await db.restaurantTable.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  const r2Tables = [
+    { label: "T1", area: "Esplanada", shape: "round", seats: 2, posX: 25, posY: 30 },
+    { label: "T2", area: "Esplanada", shape: "round", seats: 4, posX: 60, posY: 35 },
+    { label: "T3", area: "Interior", shape: "square", seats: 2, posX: 40, posY: 50 },
+  ];
+  const r2TableMap = new Map<string, string>();
+  for (const t of r2Tables) {
+    const created = await db.restaurantTable.create({
+      data: {
+        restaurantId: RESTAURANT_2_ID, label: t.label, area: t.area,
+        token: generateOpaqueToken("tbl", 16), status: "AVAILABLE",
+        shape: t.shape, seats: t.seats, posX: t.posX, posY: t.posY,
+      },
+    });
+    r2TableMap.set(t.label, created.id);
+  }
+  // An open bill on T2 + a historical paid bill.
+  const r2OpenBill = await db.bill.create({
+    data: {
+      restaurantId: RESTAURANT_2_ID, tableId: r2TableMap.get("T2")!, source: "NATIVE",
+      status: "OPEN", currency: "MZN", subtotalMinor: 0, adjustmentTotalMinor: 0, totalMinor: 0,
+    },
+  });
+  for (const [name, qty, price] of [["Café", 2, 4000], ["Croissant", 1, 7000]] as const) {
+    await db.billItem.create({ data: { billId: r2OpenBill.id, name, quantity: qty, unitPriceMinor: price, totalMinor: qty * price } });
+  }
+  await db.billAdjustment.create({ data: { billId: r2OpenBill.id, type: "SERVICE", label: "Serviço 5%", amountMinor: 750 } });
+  await db.bill.update({ where: { id: r2OpenBill.id }, data: { subtotalMinor: 15000, adjustmentTotalMinor: 750, totalMinor: 15750 } });
+  await db.restaurantTable.update({ where: { id: r2TableMap.get("T2") }, data: { status: "OCCUPIED" } });
+  const r2PaidBill = await db.bill.create({
+    data: {
+      restaurantId: RESTAURANT_2_ID, tableId: r2TableMap.get("T1")!, source: "NATIVE",
+      status: "PAID", currency: "MZN", subtotalMinor: 4800, adjustmentTotalMinor: 0, totalMinor: 4800,
+      openedAt: daysAgoDate(0, 10), closedAt: daysAgoDate(0, 10),
+    },
+  });
+  await db.payment.create({
+    data: {
+      restaurantId: RESTAURANT_2_ID, billId: r2PaidBill.id, providerCode: "MOCK", status: "SUCCEEDED",
+      amountMinor: 4800, currency: "MZN", idempotencyKey: `bill_${r2PaidBill.id}_MOCK_${Math.random().toString(36).slice(2, 8)}`,
+      confirmedAt: daysAgoDate(0, 10), initiatedAt: daysAgoDate(0, 10),
+    },
+  });
+
   console.log("ROHI seed complete.");
+  console.log(`  Restaurant 1: ${restaurant.name} (green / dark) — ${TABLES.length} mesas`);
+  console.log(`  Restaurant 2: ${r2.name} (orange / light) — ${r2Tables.length} mesas`);
+  console.log(`  Owner belongs to both restaurants (switcher).`);
   console.log(`  Restaurant: ${restaurant.id} — ${restaurant.name}`);
   console.log(`  Tables: ${TABLES.length} across Interior/Terraço/VIP`);
   console.log(`  Historical payments: ${HISTORY.length} (last 7 days, MockProvider — demo)`);

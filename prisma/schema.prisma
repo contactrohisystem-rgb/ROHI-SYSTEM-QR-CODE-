@@ -155,6 +155,21 @@ model Restaurant {
   locale    String   @default("pt-MZ") // default UI locale for this tenant
   timezone  String   @default("Africa/Maputo")
   status    String   @default("active") // active | suspended | inactive
+
+  // Restaurant profile + contact
+  phone     String?
+  address   String?
+
+  // Branding / theme configuration (per-restaurant). Applied to the staff
+  // dashboard + guest checkout via CSS variables. brandPrimary is the main
+  // accent colour (hex); appearance is the staff dashboard preference.
+  logoUrl       String?
+  coverUrl      String?
+  brandPrimary  String? // hex, e.g. "#16a34a"
+  brandSecondary String?
+  brandAccent   String?
+  appearance    String   @default("dark") // dark | light (staff dashboard)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

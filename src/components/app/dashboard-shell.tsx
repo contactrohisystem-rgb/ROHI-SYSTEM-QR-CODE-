@@ -21,6 +21,11 @@ import { DashboardSection } from "@/components/dashboard/dashboard-section";
 import { FloorPlanSection } from "@/components/floor-plan/floor-plan-section";
 import { BillingSection } from "@/components/billing/billing-section";
 import { PaymentsSection, type TransactionView } from "@/components/payments/payments-section";
+import { SettingsSection } from "@/components/settings/settings-section";
+import { BrandTheme } from "@/components/app/brand-theme";
+import { RestaurantSwitcher } from "@/components/app/restaurant-switcher";
+import type { RestaurantBrand } from "@/lib/brand";
+import type { MembershipView } from "@/types/next-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -118,6 +123,7 @@ export interface ShellUser {
   email?: string | null;
   activeRole?: string | null;
   platformRole?: string | null;
+  activeRestaurantId?: string;
   activeRestaurantName?: string | null;
 }
 
@@ -127,12 +133,16 @@ export function DashboardShell({
   canManage,
   stats,
   transactions,
+  brand,
+  memberships,
 }: {
   user: ShellUser;
   tables: TableQrView[];
   canManage: boolean;
   stats: DashboardStats;
   transactions: TransactionView[];
+  brand?: RestaurantBrand;
+  memberships?: MembershipView[];
 }) {
   const [active, setActive] = useState<SectionId>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -152,11 +162,21 @@ export function DashboardShell({
   const meta = SECTION_TITLES[active];
 
   return (
+    <BrandTheme brand={brand}>
     <div className="flex min-h-screen bg-background">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <div className="flex h-16 items-center px-5">
-          <Brand />
+          {brand?.logoUrl ? (
+            <img
+              src={brand.logoUrl}
+              alt=""
+              className="h-8 w-8 rounded-md object-cover"
+            />
+          ) : null}
+          <div className={brand?.logoUrl ? "ml-2.5" : ""}>
+            <Brand />
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto py-4">
           <SidebarBody active={active} onSelect={select} />
@@ -210,11 +230,16 @@ export function DashboardShell({
               <h1 className="truncate text-base font-semibold tracking-tight">
                 {meta.title}
               </h1>
-              {user.activeRestaurantName && (
+              {memberships && memberships.length > 1 ? (
+                <RestaurantSwitcher
+                  memberships={memberships}
+                  activeId={user.activeRestaurantId}
+                />
+              ) : user.activeRestaurantName ? (
                 <Badge variant="secondary" className="hidden sm:inline-flex">
                   {user.activeRestaurantName}
                 </Badge>
-              )}
+              ) : null}
             </div>
             <p className="truncate text-xs text-muted-foreground">
               {meta.subtitle}
@@ -255,12 +280,11 @@ export function DashboardShell({
             {active === "payments" && (
               <PaymentsSection transactions={transactions} />
             )}
-            {active === "settings" && (
-              <PlaceholderSection label="Settings" stage="10" />
-            )}
+            {active === "settings" && <SettingsSection />}
           </div>
         </main>
       </div>
     </div>
+    </BrandTheme>
   );
 }

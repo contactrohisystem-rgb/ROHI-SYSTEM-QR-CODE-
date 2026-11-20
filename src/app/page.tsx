@@ -239,12 +239,15 @@ export default async function Home() {
         email: u.email,
         activeRole: u.activeRole,
         platformRole: u.platformRole,
+        activeRestaurantId: u.activeRestaurantId,
         activeRestaurantName: u.activeRestaurantName,
       }}
       tables={tables}
       canManage={canManage}
       stats={stats}
       transactions={transactions}
+      brand={u.activeBrand}
+      memberships={u.memberships}
     />
   );
 }
