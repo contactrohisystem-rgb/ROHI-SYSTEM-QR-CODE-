@@ -32,6 +32,7 @@ export default async function Home() {
   const canManage = u.activeRole === "OWNER" || u.activeRole === "MANAGER";
 
   let tables: TableQrView[] = [];
+  let transactions: import("@/components/payments/payments-section").TransactionView[] = [];
   let stats: DashboardStats = {
     currency: "MZN",
     totalRevenueMinor: 0,
@@ -167,19 +168,21 @@ export default async function Home() {
       ...v,
     }));
 
-    // Recent transactions + their POS sync status.
-    const recent = payments.slice(0, 8);
-    const recentBillIds = recent.map((p) => p.billId);
-    const syncRecords = await db.posSyncRecord.findMany({
-      where: { billId: { in: recentBillIds }, direction: "PAYMENT_CONFIRM" },
-      select: { billId: true, status: true },
-      orderBy: { createdAt: "desc" },
-    });
+    // Recent transactions (dashboard) + full transactions list (Payments page),
+    // each with its POS sync status. One sync-records query covers all bills.
+    const allBillIds = payments.map((p) => p.billId);
+    const syncRecords = allBillIds.length
+      ? await db.posSyncRecord.findMany({
+          where: { billId: { in: allBillIds }, direction: "PAYMENT_CONFIRM" },
+          select: { billId: true, status: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
     const syncByBill = new Map<string, string>();
     for (const r of syncRecords) {
       if (!syncByBill.has(r.billId)) syncByBill.set(r.billId, r.status);
     }
-    const recentTransactions = recent.map((p) => ({
+    transactions = payments.map((p) => ({
       id: p.id,
       amountMinor: p.amountMinor,
       currency: p.currency,
@@ -187,8 +190,10 @@ export default async function Home() {
       providerCode: p.providerCode,
       tableLabel: p.bill?.table?.label ?? null,
       confirmedAt: p.confirmedAt?.toISOString() ?? null,
+      createdAt: p.createdAt.toISOString(),
       posSyncStatus: syncByBill.get(p.billId) ?? null,
     }));
+    const recentTransactions = transactions.slice(0, 8);
 
     const openBills = await db.bill.count({
       where: { restaurantId, status: "OPEN" },
@@ -239,6 +244,7 @@ export default async function Home() {
       tables={tables}
       canManage={canManage}
       stats={stats}
+      transactions={transactions}
     />
   );
 }

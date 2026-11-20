@@ -238,6 +238,46 @@ export function PosSection({ tables }: { tables: TableView[] }) {
         </p>
       </div>
 
+      {/* Integration mode distinction */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          {
+            label: "POS totalmente integrado",
+            desc: "Recebe facturas e envia confirmações de pagamento (ambas as direcções verificadas).",
+            active: !!(connection && connection.adapterCode !== "NONE"),
+          },
+          {
+            label: "Compatibilidade manual",
+            desc: "Entrada manual de contas (total apenas), sem sincronização POS.",
+            active: false,
+          },
+          {
+            label: "Facturação nativa ROHI",
+            desc: "Contas criadas no ROHI, sem POS. Sem sincronização necessária.",
+            active: !connection || connection.adapterCode === "NONE",
+          },
+        ].map((m) => (
+          <div
+            key={m.label}
+            className={`rounded-lg border p-3 ${
+              m.active ? "border-primary/40 bg-primary/5" : "border-border/60"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  m.active ? "bg-primary" : "bg-muted-foreground/40"
+                }`}
+              />
+              <span className="text-xs font-medium">{m.label}</span>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              {m.desc}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {/* Connection */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">

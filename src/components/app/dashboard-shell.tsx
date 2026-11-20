@@ -20,6 +20,7 @@ import { PosSection } from "@/components/pos/pos-section";
 import { DashboardSection } from "@/components/dashboard/dashboard-section";
 import { FloorPlanSection } from "@/components/floor-plan/floor-plan-section";
 import { BillingSection } from "@/components/billing/billing-section";
+import { PaymentsSection, type TransactionView } from "@/components/payments/payments-section";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -125,11 +126,13 @@ export function DashboardShell({
   tables,
   canManage,
   stats,
+  transactions,
 }: {
   user: ShellUser;
   tables: TableQrView[];
   canManage: boolean;
   stats: DashboardStats;
+  transactions: TransactionView[];
 }) {
   const [active, setActive] = useState<SectionId>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -250,7 +253,7 @@ export function DashboardShell({
               <BillingSection tables={tables} canManage={canManage} />
             )}
             {active === "payments" && (
-              <PlaceholderSection label="Payments & Transactions" stage="6" />
+              <PaymentsSection transactions={transactions} />
             )}
             {active === "settings" && (
               <PlaceholderSection label="Settings" stage="10" />
