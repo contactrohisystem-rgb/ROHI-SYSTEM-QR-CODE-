@@ -11,6 +11,7 @@ import {
   Receipt,
   Settings,
   Table2,
+  Utensils,
   type LucideIcon,
 } from "lucide-react";
 
