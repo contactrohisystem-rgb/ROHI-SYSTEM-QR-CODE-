@@ -19,6 +19,7 @@ import { TablesSection } from "@/components/tables/tables-section";
 import { PosSection } from "@/components/pos/pos-section";
 import { DashboardSection } from "@/components/dashboard/dashboard-section";
 import { FloorPlanSection } from "@/components/floor-plan/floor-plan-section";
+import { BillingSection } from "@/components/billing/billing-section";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -246,7 +247,7 @@ export function DashboardShell({
               <FloorPlanSection tables={tables} canManage={canManage} />
             )}
             {active === "billing" && (
-              <PlaceholderSection label="Billing & Lightweight POS" stage="5" />
+              <BillingSection tables={tables} canManage={canManage} />
             )}
             {active === "payments" && (
               <PlaceholderSection label="Payments & Transactions" stage="6" />
