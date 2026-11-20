@@ -281,11 +281,77 @@ export function FloorPlanSection({
     rotation: number;
   } | null>(null);
 
-  // areas
-  const areas = Array.from(new Set(tables.map((t) => t.area ?? "Geral")));
-  const [activeArea, setActiveArea] = useState(areas[0] ?? "Geral");
-  const areaTables = tables.filter((t) => (t.area ?? "Geral") === activeArea);
+  // Floor plans + areas (managed entities, fetched from the API)
+  interface FloorPlanView {
+    id: string;
+    name: string;
+    areas: { id: string; name: string }[];
+  }
+  const [floorPlans, setFloorPlans] = useState<FloorPlanView[]>([]);
+  const [activeFloorId, setActiveFloorId] = useState<string | null>(null);
+  const [activeAreaName, setActiveAreaName] = useState<string>("Geral");
+
+  const loadFloorPlans = useCallback(async () => {
+    try {
+      const res = await fetch("/api/floor-plans");
+      if (!res.ok) return;
+      const data = await res.json();
+      const fps = data.floorPlans ?? [];
+      setFloorPlans(fps);
+      if (fps.length > 0) {
+        setActiveFloorId((prev) => prev ?? fps[0].id);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadFloorPlans();
+  }, [loadFloorPlans]);
+
+  const activeFloor = floorPlans.find((f) => f.id === activeFloorId);
+  const managedAreas = activeFloor?.areas ?? [];
+  // Use managed areas if available; fall back to deriving from table.area strings.
+  const areaNames =
+    managedAreas.length > 0
+      ? managedAreas.map((a) => a.name)
+      : Array.from(new Set(tables.map((t) => t.area ?? "Geral")));
+  const effectiveAreaName = areaNames.includes(activeAreaName)
+    ? activeAreaName
+    : areaNames[0] ?? "Geral";
+  const areaTables = tables.filter(
+    (t) => (t.area ?? "Geral") === effectiveAreaName,
+  );
   const selected = tables.find((t) => t.id === selectedId) ?? null;
+
+  async function addFloor() {
+    const name = prompt("Nome do piso:");
+    if (!name) return;
+    const res = await fetch("/api/floor-plans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      toast({ title: "Piso criado" });
+      await loadFloorPlans();
+      router.refresh();
+    }
+  }
+
+  async function addArea() {
+    if (!activeFloorId) return;
+    const name = prompt("Nome da área:");
+    if (!name) return;
+    const res = await fetch("/api/areas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ floorPlanId: activeFloorId, name }),
+    });
+    if (res.ok) {
+      toast({ title: "Área criada" });
+      await loadFloorPlans();
+    }
+  }
 
   // dialogs
   const [billOpen, setBillOpen] = useState(false);
@@ -442,7 +508,7 @@ export function FloorPlanSection({
 
   function openAdd() {
     setEditing(null);
-    setForm({ label: "", area: activeArea, shape: "round", seats: "4" });
+    setForm({ label: "", area: effectiveAreaName, shape: "round", seats: "4" });
     setEditOpen(true);
   }
   function openEdit(t: TableQrView) {
@@ -544,15 +610,35 @@ export function FloorPlanSection({
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Floor switcher */}
+        {floorPlans.length > 1 && (
+          <div className="flex items-center gap-1.5 rounded-lg bg-muted p-0.5">
+            {floorPlans.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => { setActiveFloorId(f.id); setActiveAreaName("Geral"); }}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  activeFloorId === f.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Area tabs */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {areas.map((a) => (
+          {areaNames.map((a) => (
             <button
               key={a}
               type="button"
-              onClick={() => setActiveArea(a)}
+              onClick={() => setActiveAreaName(a)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                activeArea === a
+                effectiveAreaName === a
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
@@ -560,6 +646,16 @@ export function FloorPlanSection({
               {a}
             </button>
           ))}
+          {canManage && (
+            <button
+              type="button"
+              onClick={addArea}
+              className="rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+              aria-label="Adicionar área"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1" />
@@ -656,7 +752,7 @@ export function FloorPlanSection({
 
             {/* Area label overlay */}
             <div className="pointer-events-none absolute left-4 top-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" /> {activeArea}
+              <MapPin className="h-3.5 w-3.5" /> {effectiveAreaName}
               <span className="ml-1 text-muted-foreground/60">
                 · {areaTables.length} mesas
               </span>

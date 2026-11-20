@@ -431,6 +431,30 @@ async function main() {
     },
   });
 
+  // --- Demo menu for Restaurant 1 ---
+  await db.product.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
+  await db.menuCategory.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
+  const cats1: Record<string, string> = {};
+  for (const [i, name] of ["Entradas", "Pratos Principais", "Bebidas", "Sobremesas"].entries()) {
+    const c = await db.menuCategory.create({ data: { restaurantId: RESTAURANT_ID, name, sortOrder: i } });
+    cats1[name] = c.id;
+  }
+  const products1 = [
+    ["Entradas", "Cambarito Grelhado", "Lulas grelhadas com molho de alho", 18000],
+    ["Entradas", "Lulas Fritas", "Lulas fritas com molho tartaro", 15000],
+    ["Pratos Principais", "Frango Grelhado", "Frango grelhado com arroz e salada", 25000],
+    ["Pratos Principais", "Peixe Grelhado", "Peixe fresco do dia grelhado", 30000],
+    ["Pratos Principais", "Camarao Tigre", "Camarao tigre grelhado com manteiga de alho", 45000],
+    ["Bebidas", "Cerveja 2M", "Cerveja local gelada", 7500],
+    ["Bebidas", "Refri", "Bebida gelada", 4000],
+    ["Bebidas", "Vinho Tinto (copo)", "Vinho tinto da casa", 12000],
+    ["Sobremesas", "Bolo de Chocolate", "Bolo caseiro de chocolate", 12000],
+    ["Sobremesas", "Gelado", "Gelado artesanal", 9000],
+  ] as const;
+  for (const [cat, name, desc, price] of products1) {
+    await db.product.create({ data: { restaurantId: RESTAURANT_ID, categoryId: cats1[cat], name, description: desc, priceMinor: price } });
+  }
+
   console.log("ROHI seed complete.");
   console.log(`  Restaurant 1: ${restaurant.name} (green / dark) — ${TABLES.length} mesas`);
   console.log(`  Restaurant 2: ${r2.name} (orange / light) — ${r2Tables.length} mesas`);

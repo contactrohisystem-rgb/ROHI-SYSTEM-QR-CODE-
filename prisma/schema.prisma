@@ -175,6 +175,8 @@ model Restaurant {
 
   tables       RestaurantTable[]
   floorPlans   FloorPlan[]
+  menuCategories MenuCategory[]
+  products     Product[]
   bills        Bill[]
   payments     Payment[]
   staff        RestaurantStaff[]
@@ -296,6 +298,44 @@ model Area {
   tables    RestaurantTable[]  @relation("AreaTables")
 
   @@index([floorPlanId, sortOrder])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Menu Management (per-restaurant product catalogue)
+// ────────────────────────────────────────────────────────────────────────────
+
+model MenuCategory {
+  id           String   @id @default(cuid())
+  restaurantId String
+  name         String   // "Starters", "Main Courses", "Drinks"
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  products   Product[]
+
+  @@index([restaurantId, sortOrder])
+}
+
+model Product {
+  id           String    @id @default(cuid())
+  restaurantId String
+  categoryId   String
+  name         String
+  description  String?
+  priceMinor   Int       // integer minor units (centavos)
+  imageUrl     String?
+  available    Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, categoryId])
+  @@index([restaurantId, available])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
