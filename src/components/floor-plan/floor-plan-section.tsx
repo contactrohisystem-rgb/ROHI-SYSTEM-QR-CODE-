@@ -1,19 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Armchair,
+  Box,
   CheckCircle2,
   Clock,
+  Copy,
   ExternalLink,
+  Grid3x3,
   Loader2,
   MapPin,
+  Maximize,
+  Minus,
   Pencil,
   Plus,
   Receipt,
+  RotateCw,
   Trash2,
   Users,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,13 +29,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -47,19 +48,21 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/money";
 import type { TableQrView } from "@/components/tables/table-card";
 import { BillManager } from "@/components/billing/bill-manager";
 
-type FloorStatus = {
-  label: string;
-  ring: string; // border/ring color
-  surface: string; // table surface bg
-  dot: string;
-};
+/* ── Status helpers ────────────────────────────────────────────────────── */
 
-function floorStatus(t: TableQrView): FloorStatus {
+function floorStatus(t: TableQrView) {
   if (t.activeBill?.hasPendingPayment)
     return {
       label: "A aguardar pagamento",
@@ -96,43 +99,58 @@ function floorStatus(t: TableQrView): FloorStatus {
   };
 }
 
-const SHAPE_SIZE: Record<string, { w: number; h: number; radius: string }> = {
-  round: { w: 64, h: 64, radius: "9999px" },
-  square: { w: 54, h: 54, radius: "10px" },
-  rect: { w: 92, h: 54, radius: "12px" },
-  booth: { w: 84, h: 58, radius: "18px" },
+const SHAPE_RADIUS: Record<string, string> = {
+  round: "9999px",
+  square: "10px",
+  rect: "12px",
+  booth: "18px",
 };
+
+/* ── Table node with resize/rotate handles ─────────────────────────────── */
 
 function TableNode({
   table,
   selected,
-  dragging,
+  editMode,
   livePos,
+  liveSize,
+  liveRotation,
+  zoom,
   onSelect,
   onPointerDown,
+  onResizeStart,
+  onRotateStart,
 }: {
   table: TableQrView;
   selected: boolean;
-  dragging: boolean;
+  editMode: boolean;
   livePos: { posX: number; posY: number } | null;
+  liveSize: { width: number; height: number } | null;
+  liveRotation: number | null;
+  zoom: number;
   onSelect: () => void;
   onPointerDown: (e: React.PointerEvent) => void;
+  onResizeStart: (e: React.PointerEvent) => void;
+  onRotateStart: (e: React.PointerEvent) => void;
 }) {
   const st = floorStatus(table);
-  const size = SHAPE_SIZE[table.shape] ?? SHAPE_SIZE.round;
+  const w = liveSize?.width ?? table.width;
+  const h = liveSize?.height ?? table.height;
+  const rot = liveRotation ?? table.rotation;
   const posX = livePos?.posX ?? table.posX;
   const posY = livePos?.posY ?? table.posY;
   const seats = table.seats;
+  const radius = SHAPE_RADIUS[table.shape] ?? SHAPE_RADIUS.round;
 
   return (
     <div
-      className="absolute touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+      className="absolute touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
       style={{
         left: `${posX}%`,
         top: `${posY}%`,
-        transform: "translate(-50%, -50%)",
-        zIndex: selected || dragging ? 30 : 10,
-        cursor: dragging ? "grabbing" : "grab",
+        transform: `translate(-50%, -50%) rotate(${rot}deg)`,
+        zIndex: selected ? 30 : 10,
+        cursor: editMode ? "grab" : "pointer",
       }}
       role="button"
       tabIndex={0}
@@ -141,7 +159,7 @@ function TableNode({
       onPointerDown={onPointerDown}
       onClick={(e) => {
         e.stopPropagation();
-        if (!dragging) onSelect();
+        onSelect();
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -155,17 +173,15 @@ function TableNode({
         {/* chairs ring */}
         {Array.from({ length: seats }).map((_, i) => {
           const angle = (i / seats) * Math.PI * 2;
-          const rx = size.w / 2 + 12;
-          const ry = size.h / 2 + 12;
+          const rx = w / 2 + 10;
+          const ry = h / 2 + 10;
           const x = Math.cos(angle) * rx;
           const y = Math.sin(angle) * ry;
           return (
             <span
               key={i}
-              className="absolute h-3 w-3 rounded-sm bg-muted-foreground/40"
-              style={{
-                transform: `translate(${x}px, ${y}px)`,
-              }}
+              className="absolute h-2.5 w-2.5 rounded-sm bg-muted-foreground/35"
+              style={{ transform: `translate(${x}px, ${y}px)` }}
               aria-hidden="true"
             />
           );
@@ -173,24 +189,45 @@ function TableNode({
         {/* table surface */}
         <div
           className={`flex items-center justify-center ring-2 ${st.ring} ${st.surface} text-foreground shadow-lg transition-shadow ${
-            selected ? "shadow-xl ring-primary" : ""
+            selected ? "shadow-xl ring-primary ring-4" : ""
           }`}
           style={{
-            width: size.w,
-            height: size.h,
-            borderRadius: size.radius,
+            width: w,
+            height: h,
+            borderRadius: radius,
             backgroundImage:
               "linear-gradient(135deg, oklch(1 0 0 / 6%), oklch(0 0 0 / 8%))",
           }}
         >
           <span className="text-[11px] font-semibold tabular">
-            {table.label.replace(/^Mesa\s+/i, "")}
+            {table.label.replace(/^Mesa\s+/i, "").replace(/^Table\s+/i, "")}
           </span>
         </div>
         {/* status dot */}
         <span
           className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-card ${st.dot}`}
         />
+
+        {/* resize handle (bottom-right, edit mode only) */}
+        {selected && editMode && (
+          <div
+            className="absolute -bottom-1 -right-1 h-4 w-4 cursor-se-resize rounded-full border-2 border-primary bg-background"
+            onPointerDown={onResizeStart}
+            style={{ zIndex: 40 }}
+            aria-label="Redimensionar"
+          />
+        )}
+        {/* rotate handle (top, edit mode only) */}
+        {selected && editMode && (
+          <div
+            className="absolute -top-6 left-1/2 h-4 w-4 -translate-x-1/2 cursor-grab rounded-full border-2 border-primary bg-background"
+            onPointerDown={onRotateStart}
+            style={{ zIndex: 40 }}
+            aria-label="Rotacionar"
+          >
+            <RotateCw className="h-2.5 w-2.5 text-primary" />
+          </div>
+        )}
       </div>
       {/* label below */}
       <div className="mt-1 text-center text-[10px] font-medium text-muted-foreground">
@@ -199,6 +236,8 @@ function TableNode({
     </div>
   );
 }
+
+/* ── Main section ───────────────────────────────────────────────────────── */
 
 export function FloorPlanSection({
   tables,
@@ -210,87 +249,196 @@ export function FloorPlanSection({
   const router = useRouter();
   const { toast } = useToast();
   const containerRef = useRef<HTMLDivElement>(null);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dragging, setDragging] = useState<{
+  const [editMode, setEditMode] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [gridSnap, setGridSnap] = useState(false);
+  const [iso, setIso] = useState(false);
+
+  // drag state
+  const [drag, setDrag] = useState<{
+    type: "move" | "resize" | "rotate" | "pan";
     id: string;
     startX: number;
     startY: number;
-    origPosX: number;
-    origPosY: number;
+    orig: { posX: number; posY: number; width: number; height: number; rotation: number };
   } | null>(null);
-  const dragPosRef = useRef<{ posX: number; posY: number } | null>(null);
-  const [dragRender, setDragRender] = useState<{
+  const liveRef = useRef<{
+    posX: number;
+    posY: number;
+    width: number;
+    height: number;
+    rotation: number;
+  } | null>(null);
+  const [liveRender, setLiveRender] = useState<{
     id: string;
     posX: number;
     posY: number;
+    width: number;
+    height: number;
+    rotation: number;
   } | null>(null);
 
-  // areas derived from tables
+  // areas
   const areas = Array.from(new Set(tables.map((t) => t.area ?? "Geral")));
   const [activeArea, setActiveArea] = useState(areas[0] ?? "Geral");
   const areaTables = tables.filter((t) => (t.area ?? "Geral") === activeArea);
-
   const selected = tables.find((t) => t.id === selectedId) ?? null;
 
-  // bill manager for the selected table
+  // dialogs
   const [billOpen, setBillOpen] = useState(false);
-
-  // add/edit dialog
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<TableQrView | null>(null);
   const [form, setForm] = useState({ label: "", area: "", shape: "round", seats: "4" });
   const [saving, setSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // drag listeners
+  /* ── Drag/resize/rotate/pan logic ─────────────────────────────────────── */
+
   useEffect(() => {
-    if (!dragging) return;
+    if (!drag) return;
     function onMove(e: PointerEvent) {
-      if (!dragging || !containerRef.current) return;
+      if (!drag || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      const dxPct = ((e.clientX - dragging.startX) / rect.width) * 100;
-      const dyPct = ((e.clientY - dragging.startY) / rect.height) * 100;
-      const posX = Math.max(6, Math.min(94, dragging.origPosX + dxPct));
-      const posY = Math.max(8, Math.min(92, dragging.origPosY + dyPct));
-      dragPosRef.current = { posX, posY };
-      setDragRender({ id: dragging.id, posX, posY });
-    }
-    async function onUp() {
-      const pos = dragPosRef.current;
-      if (pos) {
-        await fetch(`/api/tables/${dragging.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ posX: pos.posX, posY: pos.posY }),
-        });
-        router.refresh();
+      const dxPx = e.clientX - drag.startX;
+      const dyPx = e.clientY - drag.startY;
+
+      if (drag.type === "pan") {
+        setPan({ x: pan.x + dxPx, y: pan.y + dyPx });
+        return;
       }
-      setDragging(null);
-      setDragRender(null);
-      dragPosRef.current = null;
+
+      // For table ops, work in unscaled coordinates (divide by zoom)
+      const dx = dxPx / zoom;
+      const dy = dyPx / zoom;
+
+      if (drag.type === "move") {
+        const dxPct = (dx / rect.width) * 100;
+        const dyPct = (dy / rect.height) * 100;
+        let posX = drag.orig.posX + dxPct;
+        let posY = drag.orig.posY + dyPct;
+        if (gridSnap) {
+          posX = Math.round(posX / 5) * 5;
+          posY = Math.round(posY / 5) * 5;
+        }
+        posX = Math.max(5, Math.min(95, posX));
+        posY = Math.max(5, Math.min(95, posY));
+        liveRef.current = { ...drag.orig, posX, posY };
+        setLiveRender({ id: drag.id, ...liveRef.current });
+      } else if (drag.type === "resize") {
+        const width = Math.max(30, Math.min(250, drag.orig.width + dx));
+        const height = Math.max(30, Math.min(250, drag.orig.height + dy));
+        liveRef.current = { ...drag.orig, width, height };
+        setLiveRender({ id: drag.id, ...liveRef.current });
+      } else if (drag.type === "rotate") {
+        const cx = rect.left + (drag.orig.posX / 100) * rect.width;
+        const cy = rect.top + (drag.orig.posY / 100) * rect.height;
+        const angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) + 90;
+        const rotation = Math.round(angle);
+        liveRef.current = { ...drag.orig, rotation };
+        setLiveRender({ id: drag.id, ...liveRef.current });
+      }
     }
+
+    async function onUp() {
+      const live = liveRef.current;
+      if (live && drag) {
+        const payload: Record<string, number> = {};
+        if (Math.abs(live.posX - drag.orig.posX) > 0.1) payload.posX = live.posX;
+        if (Math.abs(live.posY - drag.orig.posY) > 0.1) payload.posY = live.posY;
+        if (Math.abs(live.width - drag.orig.width) > 0.5) payload.width = live.width;
+        if (Math.abs(live.height - drag.orig.height) > 0.5) payload.height = live.height;
+        if (Math.abs(live.rotation - drag.orig.rotation) > 0.5) payload.rotation = live.rotation;
+        if (Object.keys(payload).length > 0) {
+          await fetch(`/api/tables/${drag.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          router.refresh();
+        }
+      }
+      setDrag(null);
+      setLiveRender(null);
+      liveRef.current = null;
+    }
+
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [dragging, router]);
+  }, [drag, zoom, pan, gridSnap, router]);
 
-  function startDrag(e: React.PointerEvent, t: TableQrView) {
-    if (!canManage) return;
-    if (e.button !== 0) return;
+  function startMove(e: React.PointerEvent, t: TableQrView) {
+    if (!editMode || !canManage) return;
     e.stopPropagation();
     setSelectedId(t.id);
-    setDragging({
+    setDrag({
+      type: "move",
       id: t.id,
       startX: e.clientX,
       startY: e.clientY,
-      origPosX: t.posX,
-      origPosY: t.posY,
+      orig: { posX: t.posX, posY: t.posY, width: t.width, height: t.height, rotation: t.rotation },
     });
-    dragPosRef.current = { posX: t.posX, posY: t.posY };
+    liveRef.current = { posX: t.posX, posY: t.posY, width: t.width, height: t.height, rotation: t.rotation };
   }
+
+  function startResize(e: React.PointerEvent, t: TableQrView) {
+    e.stopPropagation();
+    setDrag({
+      type: "resize",
+      id: t.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      orig: { posX: t.posX, posY: t.posY, width: t.width, height: t.height, rotation: t.rotation },
+    });
+    liveRef.current = { posX: t.posX, posY: t.posY, width: t.width, height: t.height, rotation: t.rotation };
+  }
+
+  function startRotate(e: React.PointerEvent, t: TableQrView) {
+    e.stopPropagation();
+    setDrag({
+      type: "rotate",
+      id: t.id,
+      startX: e.clientX,
+      startY: e.clientY,
+      orig: { posX: t.posX, posY: t.posY, width: t.width, height: t.height, rotation: t.rotation },
+    });
+    liveRef.current = { posX: t.posX, posY: t.posY, width: t.width, height: t.height, rotation: t.rotation };
+  }
+
+  function startPan(e: React.PointerEvent) {
+    if (editMode && canManage) {
+      setDrag({
+        type: "pan",
+        id: "",
+        startX: e.clientX,
+        startY: e.clientY,
+        orig: { posX: 0, posY: 0, width: 0, height: 0, rotation: 0 },
+      });
+    }
+    setSelectedId(null);
+  }
+
+  /* ── Zoom (wheel) ────────────────────────────────────────────────────── */
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setZoom((z) => Math.max(0.4, Math.min(2.5, z + delta)));
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  /* ── CRUD ────────────────────────────────────────────────────────────── */
 
   function openAdd() {
     setEditing(null);
@@ -299,12 +447,7 @@ export function FloorPlanSection({
   }
   function openEdit(t: TableQrView) {
     setEditing(t);
-    setForm({
-      label: t.label,
-      area: t.area ?? "",
-      shape: t.shape,
-      seats: String(t.seats),
-    });
+    setForm({ label: t.label, area: t.area ?? "", shape: t.shape, seats: String(t.seats) });
     setEditOpen(true);
   }
 
@@ -349,21 +492,35 @@ export function FloorPlanSection({
     }
   }
 
+  async function duplicateTable() {
+    if (!selected) return;
+    const res = await fetch("/api/tables", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        label: `${selected.label} (cópia)`,
+        area: selected.area || null,
+        shape: selected.shape,
+        seats: selected.seats,
+        posX: Math.min(90, selected.posX + 10),
+        posY: Math.min(90, selected.posY + 10),
+      }),
+    });
+    if (res.ok) {
+      toast({ title: "Mesa duplicada" });
+      router.refresh();
+    }
+  }
+
   async function deleteTable() {
     if (!selected) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/tables/${selected.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/tables/${selected.id}`, { method: "DELETE" });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         if (d.error === "table_has_bills") {
-          toast({
-            title: "Não é possível eliminar",
-            description: "Esta mesa tem contas associadas.",
-            variant: "destructive",
-          });
+          toast({ title: "Não é possível eliminar", description: "Esta mesa tem contas.", variant: "destructive" });
         } else throw new Error();
       } else {
         toast({ title: "Mesa eliminada" });
@@ -377,10 +534,17 @@ export function FloorPlanSection({
     }
   }
 
+  /* ── Render ──────────────────────────────────────────────────────────── */
+
+  const floorTransform = iso
+    ? `scale(${zoom}) translate(${pan.x}px, ${pan.y}px) rotateX(55deg) rotateZ(45deg)`
+    : `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`;
+
   return (
     <div className="space-y-4">
-      {/* Area switcher + add */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Area tabs */}
         <div className="flex flex-wrap items-center gap-1.5">
           {areas.map((a) => (
             <button
@@ -397,39 +561,100 @@ export function FloorPlanSection({
             </button>
           ))}
         </div>
+
+        <div className="flex-1" />
+
+        {/* Editor controls */}
         {canManage && (
-          <Button size="sm" onClick={openAdd}>
-            <Plus className="mr-1.5 h-4 w-4" /> Nova mesa
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant={editMode ? "default" : "outline"}
+              onClick={() => setEditMode(!editMode)}
+            >
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              {editMode ? "Editar" : "Ver"}
+            </Button>
+            <Button
+              size="sm"
+              variant={gridSnap ? "default" : "outline"}
+              onClick={() => setGridSnap(!gridSnap)}
+              aria-label="Snap à grelha"
+            >
+              <Grid3x3 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant={iso ? "default" : "outline"}
+              onClick={() => setIso(!iso)}
+              aria-label="Vista isométrica"
+            >
+              <Box className="h-3.5 w-3.5" />
+            </Button>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.max(0.4, z - 0.1))}>
+                <ZoomOut className="h-3.5 w-3.5" />
+              </Button>
+              <span className="w-12 text-center text-xs tabular text-muted-foreground">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.min(2.5, z + 0.1))}>
+                <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>
+                <Maximize className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <Button size="sm" onClick={openAdd}>
+              <Plus className="mr-1.5 h-4 w-4" /> Nova mesa
+            </Button>
+          </>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Floor */}
+        {/* Floor canvas */}
         <Card className="overflow-hidden lg:col-span-2">
           <div
             ref={containerRef}
-            className="relative h-[420px] w-full touch-none select-none bg-[radial-gradient(circle,oklch(1_0_0/5%)_1px,transparent_1px)] [background-size:22px_22px] lg:h-[480px]"
-            onPointerDown={() => setSelectedId(null)}
+            className="relative h-[460px] w-full touch-none select-none overflow-hidden bg-[radial-gradient(circle,oklch(1_0_0/5%)_1px,transparent_1px)] [background-size:24px_24px]"
+            onPointerDown={startPan}
+            style={{ perspective: iso ? "800px" : undefined }}
           >
-            {areaTables.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Sem mesas nesta área
-              </div>
-            ) : (
-              areaTables.map((t) => (
-                <TableNode
-                  key={t.id}
-                  table={t}
-                  selected={selectedId === t.id}
-                  dragging={dragging?.id === t.id}
-                  livePos={dragRender?.id === t.id ? dragRender : null}
-                  onSelect={() => setSelectedId(t.id)}
-                  onPointerDown={(e) => startDrag(e, t)}
-                />
-              ))
-            )}
-            {/* area label */}
+            {/* Transformable floor */}
+            <div
+              className="absolute inset-0 origin-center"
+              style={{
+                transform: floorTransform,
+                transformStyle: iso ? "preserve-3d" : undefined,
+                transition: drag ? "none" : "transform 0.15s ease-out",
+              }}
+            >
+              {areaTables.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  Sem mesas nesta área
+                </div>
+              ) : (
+                areaTables.map((t) => (
+                  <TableNode
+                    key={t.id}
+                    table={t}
+                    selected={selectedId === t.id}
+                    editMode={editMode && canManage}
+                    livePos={liveRender?.id === t.id ? { posX: liveRender.posX, posY: liveRender.posY } : null}
+                    liveSize={liveRender?.id === t.id ? { width: liveRender.width, height: liveRender.height } : null}
+                    liveRotation={liveRender?.id === t.id ? liveRender.rotation : null}
+                    zoom={zoom}
+                    onSelect={() => setSelectedId(t.id)}
+                    onPointerDown={(e) => startMove(e, t)}
+                    onResizeStart={(e) => startResize(e, t)}
+                    onRotateStart={(e) => startRotate(e, t)}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Area label overlay */}
             <div className="pointer-events-none absolute left-4 top-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" /> {activeArea}
               <span className="ml-1 text-muted-foreground/60">
@@ -448,7 +673,7 @@ export function FloorPlanSection({
                 <p className="text-sm font-medium">Seleccione uma mesa</p>
                 <p className="max-w-[16rem] text-xs text-muted-foreground">
                   Clique numa mesa para ver o estado, abrir a conta ou gerir o
-                  QR. {canManage ? "Arraste para reposicionar." : ""}
+                  QR. {editMode && canManage ? "Arraste para mover. Use a roda do rato para zoom." : ""}
                 </p>
               </div>
             ) : (
@@ -460,10 +685,7 @@ export function FloorPlanSection({
                       <MapPin className="h-3 w-3" /> {selected.area ?? "Geral"}
                     </div>
                   </div>
-                  <Badge
-                    variant="secondary"
-                    className={`${floorStatus(selected).surface} ${floorStatus(selected).dot.replace("bg-", "text-")}`}
-                  >
+                  <Badge variant="secondary" className={floorStatus(selected).surface}>
                     <span className={`mr-1 h-1.5 w-1.5 rounded-full ${floorStatus(selected).dot}`} />
                     {floorStatus(selected).label}
                   </Badge>
@@ -471,33 +693,34 @@ export function FloorPlanSection({
 
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-lg border border-border/60 p-2.5">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Capacidade
-                    </div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Capacidade</div>
                     <div className="mt-0.5 flex items-center gap-1 font-medium">
                       <Users className="h-3.5 w-3.5 text-muted-foreground" />
                       {selected.seats}
                     </div>
                   </div>
                   <div className="rounded-lg border border-border/60 p-2.5">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Forma
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Forma</div>
+                    <div className="mt-0.5 font-medium capitalize">{selected.shape}</div>
+                  </div>
+                  <div className="rounded-lg border border-border/60 p-2.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Dimensão</div>
+                    <div className="mt-0.5 font-medium tabular">
+                      {Math.round(selected.width)}×{Math.round(selected.height)}
                     </div>
-                    <div className="mt-0.5 font-medium capitalize">
-                      {selected.shape}
+                  </div>
+                  <div className="rounded-lg border border-border/60 p-2.5">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Rotação</div>
+                    <div className="mt-0.5 font-medium tabular">
+                      {Math.round(selected.rotation)}°
                     </div>
                   </div>
                   {selected.activeBill && (
                     <div className="col-span-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Conta aberta
-                        </span>
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Conta aberta</span>
                         <span className="text-sm font-semibold tabular text-primary">
-                          {formatMoney(
-                            selected.activeBill.totalMinor,
-                            selected.activeBill.currency,
-                          )}
+                          {formatMoney(selected.activeBill.totalMinor, selected.activeBill.currency)}
                         </span>
                       </div>
                     </div>
@@ -505,11 +728,7 @@ export function FloorPlanSection({
                 </div>
 
                 <div className="space-y-2">
-                  <Button
-                    className="w-full"
-                    onClick={() => setBillOpen(true)}
-                    disabled={!selected.activeBill}
-                  >
+                  <Button className="w-full" onClick={() => setBillOpen(true)} disabled={!selected.activeBill}>
                     <Receipt className="mr-1.5 h-4 w-4" /> Ver conta
                   </Button>
                   <Button asChild variant="outline" className="w-full">
@@ -519,12 +738,10 @@ export function FloorPlanSection({
                   </Button>
                   {canManage && (
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => openEdit(selected)}
-                      >
+                      <Button variant="outline" size="sm" className="flex-1" onClick={duplicateTable}>
+                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => openEdit(selected)}>
                         <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
                       </Button>
                       <AlertDialog>
@@ -532,32 +749,20 @@ export function FloorPlanSection({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="flex-1 text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive"
                             disabled={deleteLoading}
                           >
-                            {deleteLoading ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                            )}
-                            Eliminar
+                            {deleteLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Eliminar {selected.label}?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acção não pode ser desfeita.
-                            </AlertDialogDescription>
+                            <AlertDialogTitle>Eliminar {selected.label}?</AlertDialogTitle>
+                            <AlertDialogDescription>Esta acção não pode ser desfeita.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={deleteTable}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
+                            <AlertDialogAction onClick={deleteTable} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                               Eliminar
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -569,19 +774,10 @@ export function FloorPlanSection({
 
                 {/* legend */}
                 <div className="space-y-1 border-t border-border/60 pt-3 text-[11px] text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-primary/60" /> Disponível
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-primary" /> Conta aberta
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[oklch(0.7_0.15_65)]" />{" "}
-                    A aguardar / reservada
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground" /> Ocupada
-                  </div>
+                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary/60" /> Disponível</div>
+                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-primary" /> Conta aberta</div>
+                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[oklch(0.7_0.15_65)]" /> A aguardar / reservada</div>
+                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-muted-foreground" /> Ocupada</div>
                 </div>
               </div>
             )}
@@ -594,53 +790,27 @@ export function FloorPlanSection({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editing ? "Editar mesa" : "Nova mesa"}</DialogTitle>
-            <DialogDescription>
-              {editing
-                ? "Altere o identificador, área, forma e capacidade."
-                : "Adicione uma mesa ao plano. O QR é gerado automaticamente."}
-            </DialogDescription>
+            <DialogDescription>{editing ? "Altere as propriedades da mesa." : "Adicione uma mesa. O QR é gerado automaticamente."}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="fp-label">Identificador</Label>
-              <Input
-                id="fp-label"
-                placeholder="Mesa 8"
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-              />
+              <Input id="fp-label" placeholder="Mesa 8" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="fp-area">Área</Label>
-                <Input
-                  id="fp-area"
-                  placeholder="Interior"
-                  value={form.area}
-                  onChange={(e) => setForm({ ...form, area: e.target.value })}
-                />
+                <Input id="fp-area" placeholder="Interior" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fp-seats">Capacidade</Label>
-                <Input
-                  id="fp-seats"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={form.seats}
-                  onChange={(e) => setForm({ ...form, seats: e.target.value })}
-                />
+                <Input id="fp-seats" type="number" min={1} max={20} value={form.seats} onChange={(e) => setForm({ ...form, seats: e.target.value })} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Forma</Label>
-              <Select
-                value={form.shape}
-                onValueChange={(v) => setForm({ ...form, shape: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={form.shape} onValueChange={(v) => setForm({ ...form, shape: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="round">Redonda</SelectItem>
                   <SelectItem value="square">Quadrada</SelectItem>
@@ -651,13 +821,7 @@ export function FloorPlanSection({
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditOpen(false)}
-              disabled={saving}
-            >
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancelar</Button>
             <Button onClick={saveTable} disabled={saving || !form.label}>
               {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               {editing ? "Guardar" : "Criar"}
@@ -666,16 +830,12 @@ export function FloorPlanSection({
         </DialogContent>
       </Dialog>
 
-      {/* Bill manager for the selected table */}
       {selected && (
         <BillManager
           tableId={selected.id}
           tableName={selected.label}
           open={billOpen}
-          onOpenChange={(v) => {
-            setBillOpen(v);
-            if (!v) router.refresh();
-          }}
+          onOpenChange={(v) => { setBillOpen(v); if (!v) router.refresh(); }}
           canVoid={canManage}
         />
       )}
