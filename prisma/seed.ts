@@ -23,13 +23,13 @@ const MANAGER_ID = "demo-manager";
 const DEMO_PASSWORD = "demo1234";
 
 const TABLES = [
-  { label: "Mesa 1", area: "Interior", shape: "round", seats: 4 },
-  { label: "Mesa 2", area: "Interior", shape: "square", seats: 2 },
-  { label: "Mesa 3", area: "Interior", shape: "round", seats: 4 },
-  { label: "Mesa 4", area: "Interior", shape: "rect", seats: 6 },
-  { label: "Mesa 5", area: "Terraço", shape: "round", seats: 4 },
-  { label: "Mesa 6", area: "Terraço", shape: "square", seats: 2 },
-  { label: "Mesa 7", area: "VIP", shape: "round", seats: 6 },
+  { label: "Mesa 1", area: "Interior", shape: "round", seats: 4, posX: 20, posY: 30 },
+  { label: "Mesa 2", area: "Interior", shape: "square", seats: 2, posX: 55, posY: 25 },
+  { label: "Mesa 3", area: "Interior", shape: "round", seats: 4, posX: 20, posY: 70 },
+  { label: "Mesa 4", area: "Interior", shape: "rect", seats: 6, posX: 62, posY: 68 },
+  { label: "Mesa 5", area: "Terraço", shape: "round", seats: 4, posX: 30, posY: 35 },
+  { label: "Mesa 6", area: "Terraço", shape: "square", seats: 2, posX: 70, posY: 45 },
+  { label: "Mesa 7", area: "VIP", shape: "round", seats: 6, posX: 45, posY: 45 },
 ];
 
 // Historical paid bills: [daysAgo, amountMinor, tableLabel]
@@ -127,6 +127,10 @@ async function main() {
         area: t.area,
         token: generateOpaqueToken("tbl", 16),
         status: "AVAILABLE",
+        shape: t.shape,
+        seats: t.seats,
+        posX: t.posX,
+        posY: t.posY,
       },
     });
     tableMap.set(t.label, created.id);

@@ -44,6 +44,7 @@ export interface ActiveBillSummary {
   id: string;
   totalMinor: number;
   currency: string;
+  hasPendingPayment: boolean;
 }
 
 export interface TableQrView {
@@ -52,6 +53,10 @@ export interface TableQrView {
   area: string | null;
   status: "AVAILABLE" | "OCCUPIED" | "RESERVED";
   token: string;
+  shape: string;
+  seats: number;
+  posX: number;
+  posY: number;
   payUrl: string;
   qrDataUrl: string;
   activeBill: ActiveBillSummary | null;

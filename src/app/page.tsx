@@ -63,18 +63,43 @@ export default async function Home() {
         },
       },
     });
+    // Pending payments for active bills (drives "awaiting payment" status).
+    const activeBillIds = tableRows.flatMap((t) => t.bills.map((b) => b.id));
+    const pendingPayments = activeBillIds.length
+      ? await db.payment.findMany({
+          where: {
+            billId: { in: activeBillIds },
+            status: { in: ["INITIATED", "PENDING"] },
+          },
+          select: { billId: true },
+          distinct: ["billId"],
+        })
+      : [];
+    const pendingBillIds = new Set(pendingPayments.map((p) => p.billId));
     tables = await Promise.all(
       tableRows.map(async (t) => {
         const payUrl = `${baseUrl}/pay?table=${t.token}`;
+        const ab = t.bills[0] ?? null;
         return {
           id: t.id,
           label: t.label,
           area: t.area,
           status: t.status,
           token: t.token,
+          shape: t.shape,
+          seats: t.seats,
+          posX: t.posX,
+          posY: t.posY,
           payUrl,
           qrDataUrl: await generateQrDataUrl(payUrl),
-          activeBill: t.bills[0] ?? null,
+          activeBill: ab
+            ? {
+                id: ab.id,
+                totalMinor: ab.totalMinor,
+                currency: ab.currency,
+                hasPendingPayment: pendingBillIds.has(ab.id),
+              }
+            : null,
         } satisfies TableQrView;
       }),
     );

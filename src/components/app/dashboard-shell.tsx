@@ -18,6 +18,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { TablesSection } from "@/components/tables/tables-section";
 import { PosSection } from "@/components/pos/pos-section";
 import { DashboardSection } from "@/components/dashboard/dashboard-section";
+import { FloorPlanSection } from "@/components/floor-plan/floor-plan-section";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -242,7 +243,7 @@ export function DashboardShell({
               />
             )}
             {active === "floor-plan" && (
-              <PlaceholderSection label="Interactive Floor Plan" stage="3" />
+              <FloorPlanSection tables={tables} canManage={canManage} />
             )}
             {active === "billing" && (
               <PlaceholderSection label="Billing & Lightweight POS" stage="5" />

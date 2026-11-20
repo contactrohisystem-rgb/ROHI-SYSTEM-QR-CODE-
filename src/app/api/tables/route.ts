@@ -7,6 +7,10 @@ import { generateOpaqueToken } from "@/lib/tokens";
 const createSchema = z.object({
   label: z.string().min(1, "Label required").max(60),
   area: z.string().max(60).optional().nullable(),
+  shape: z.enum(["round", "square", "rect", "booth"]).optional(),
+  seats: z.number().int().min(1).max(20).optional(),
+  posX: z.number().min(0).max(100).optional(),
+  posY: z.number().min(0).max(100).optional(),
 });
 
 // GET /api/tables — list tables for the active restaurant (MANAGER+).
@@ -43,6 +47,10 @@ export async function POST(req: Request) {
       area: parsed.data.area ?? null,
       token: generateOpaqueToken("tbl", 16),
       status: "AVAILABLE",
+      shape: parsed.data.shape ?? "round",
+      seats: parsed.data.seats ?? 4,
+      posX: parsed.data.posX ?? 50,
+      posY: parsed.data.posY ?? 40,
     },
   });
 

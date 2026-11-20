@@ -7,6 +7,10 @@ const patchSchema = z.object({
   label: z.string().min(1).max(60).optional(),
   area: z.string().max(60).nullable().optional(),
   status: z.enum(["AVAILABLE", "OCCUPIED", "RESERVED"]).optional(),
+  shape: z.enum(["round", "square", "rect", "booth"]).optional(),
+  seats: z.number().int().min(1).max(20).optional(),
+  posX: z.number().min(0).max(100).optional(),
+  posY: z.number().min(0).max(100).optional(),
 });
 
 // Enforces tenant scoping on the [id] param: the table must belong to the

@@ -223,6 +223,13 @@ model RestaurantTable {
   // resolves token -> table -> restaurant -> active bill on every request.
   token        String      @unique
   status       TableStatus @default(AVAILABLE)
+  // Floor-plan placement + visual properties. posX/posY are percentages
+  // (0-100) of the floor container, so the layout is responsive. shape is
+  // round | square | rect | booth. seats is the table capacity.
+  posX         Float       @default(20)
+  posY         Float       @default(20)
+  shape        String      @default("round")
+  seats        Int         @default(4)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
