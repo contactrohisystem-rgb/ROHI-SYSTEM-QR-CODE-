@@ -9,25 +9,16 @@ import { LangToggle } from "@/components/lang-toggle";
 import { getActiveBillForTable } from "@/lib/billing";
 import { formatMoney } from "@/lib/money";
 import { CheckoutPanel } from "@/components/payments/checkout-panel";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { CheckCircle2, QrCode, Store, Utensils } from "lucide-react";
 
 export const metadata = { title: "ROHI — Pagamento" };
 
-// A bill is considered "recently paid" (and shown as a confirmation card on
-// reload) if it was paid within this window. Lets the guest see a success
-// state if they refresh right after paying.
 const RECENT_PAID_WINDOW_MS = 30 * 60 * 1000;
 
 /**
- * Guest payment entry point.
+ * Guest payment entry point (LIGHT theme, mobile-first).
  *
  * The QR encodes only /pay?table=<opaque token>. The backend resolves token ->
  * table -> restaurant -> active bill server-side. The guest never receives a
@@ -55,12 +46,9 @@ export default async function PayPage({
 
   const invalid = !table || table.restaurant.status !== "active";
 
-  // Active (OPEN) bill for the table.
   const activeBill =
     table && !invalid ? await getActiveBillForTable(table.id) : null;
 
-  // If no active bill, look for a recently-PAID bill so a post-payment reload
-  // shows a confirmation instead of an abrupt "no active bill".
   let recentPaidBill: {
     id: string;
     totalMinor: number;
@@ -80,84 +68,99 @@ export default async function PayPage({
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <header className="border-b">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 p-4">
-          <span className="text-lg font-semibold tracking-tight">
-            {t("title")}
-          </span>
+    <main className="theme-light flex min-h-screen flex-col bg-background">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+              <span className="text-[10px] font-bold text-primary-foreground">
+                R
+              </span>
+            </div>
+            <span className="text-sm font-semibold tracking-tight">
+              {t("title")}
+            </span>
+          </div>
           <LangToggle locale={locale as "pt" | "en"} />
         </div>
       </header>
 
-      <section className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4">
+      <section className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 p-4">
         {invalid ? (
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-lg">{t("invalidTitle")}</CardTitle>
-              <CardDescription>{t("invalidDescription")}</CardDescription>
-            </CardHeader>
+          <Card className="mt-6 border-border/60">
+            <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+              <QrCode className="h-10 w-10 text-muted-foreground/40" />
+              <p className="text-base font-medium">{t("invalidTitle")}</p>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                {t("invalidDescription")}
+              </p>
+            </CardContent>
           </Card>
         ) : (
           <>
-            {/* Restaurant + table identification */}
-            <Card>
-              <CardHeader className="space-y-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Store className="h-4 w-4" />
-                  <span className="text-xs uppercase tracking-wide">
-                    {t("restaurant")}
-                  </span>
-                </div>
-                <CardTitle className="text-xl">
-                  {table!.restaurant.name}
-                </CardTitle>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Utensils className="h-4 w-4" />
-                  <span className="text-xs uppercase tracking-wide">
-                    {t("table")}
-                  </span>
-                </div>
-                <div className="text-lg font-medium">{table!.label}</div>
-                {table!.area && (
-                  <div className="text-sm text-muted-foreground">
-                    {table!.area}
+            {/* Restaurant identity */}
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+              <div
+                className="h-20"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.55 0.16 150), oklch(0.42 0.13 160) 60%, oklch(0.32 0.1 165))",
+                }}
+              />
+              <div className="px-4 pb-4">
+                <div className="-mt-6 flex items-end justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-card bg-muted shadow-sm">
+                    <Store className="h-5 w-5 text-foreground" />
                   </div>
+                  <div className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    <Utensils className="h-3 w-3" />
+                    {t("table")} {table!.label}
+                  </div>
+                </div>
+                <h1 className="mt-2 text-lg font-semibold tracking-tight">
+                  {table!.restaurant.name}
+                </h1>
+                {table!.area && (
+                  <p className="text-xs text-muted-foreground">{table!.area}</p>
                 )}
-              </CardHeader>
-            </Card>
+              </div>
+            </div>
 
             {activeBill ? (
               <>
-                {/* Read-only bill breakdown */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{t("bill")}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
+                {/* Bill */}
+                <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+                  <div className="border-b border-border/60 px-4 py-2.5">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {t("bill")}
+                    </span>
+                  </div>
+                  <div className="px-4 py-3">
                     {activeBill.items.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="py-3 text-sm text-muted-foreground">
                         {t("noItems")}
                       </p>
                     ) : (
-                      <div className="space-y-1.5">
+                      <div className="divide-y divide-border/60">
                         {activeBill.items.map((it) => (
                           <div
                             key={it.id}
-                            className="flex items-start justify-between gap-2 text-sm"
+                            className="flex items-start justify-between gap-3 py-2.5"
                           >
                             <div className="min-w-0">
-                              <span className="font-medium">{it.name}</span>
-                              <span className="ml-1 text-muted-foreground">
+                              <div className="text-sm font-medium">
+                                {it.name}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
                                 {it.quantity} ×{" "}
                                 {formatMoney(
                                   it.unitPriceMinor,
                                   activeBill.currency,
                                   moneyLocale,
                                 )}
-                              </span>
+                              </div>
                             </div>
-                            <span className="font-medium">
+                            <span className="text-sm font-medium tabular">
                               {formatMoney(
                                 it.totalMinor,
                                 activeBill.currency,
@@ -171,8 +174,8 @@ export default async function PayPage({
 
                     {activeBill.adjustments.length > 0 && (
                       <>
-                        <Separator />
-                        <div className="space-y-1">
+                        <Separator className="my-1 bg-border/60" />
+                        <div className="space-y-1 py-1">
                           {activeBill.adjustments.map((a) => (
                             <div
                               key={a.id}
@@ -183,7 +186,9 @@ export default async function PayPage({
                               </span>
                               <span
                                 className={
-                                  a.amountMinor < 0 ? "text-destructive" : ""
+                                  a.amountMinor < 0
+                                    ? "tabular text-destructive"
+                                    : "tabular"
                                 }
                               >
                                 {formatMoney(
@@ -198,13 +203,13 @@ export default async function PayPage({
                       </>
                     )}
 
-                    <Separator />
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
+                    <Separator className="my-2 bg-border/60" />
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">
                           {t("subtotal")}
                         </span>
-                        <span>
+                        <span className="tabular">
                           {formatMoney(
                             activeBill.subtotalMinor,
                             activeBill.currency,
@@ -213,11 +218,11 @@ export default async function PayPage({
                         </span>
                       </div>
                       {activeBill.adjustmentTotalMinor !== 0 && (
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
                             {t("adjustments")}
                           </span>
-                          <span>
+                          <span className="tabular">
                             {formatMoney(
                               activeBill.adjustmentTotalMinor,
                               activeBill.currency,
@@ -226,9 +231,9 @@ export default async function PayPage({
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between text-base font-semibold">
+                      <div className="flex justify-between pt-1 text-lg font-semibold">
                         <span>{t("total")}</span>
-                        <span>
+                        <span className="tabular">
                           {formatMoney(
                             activeBill.totalMinor,
                             activeBill.currency,
@@ -237,10 +242,10 @@ export default async function PayPage({
                         </span>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
 
-                {/* Interactive checkout (client) */}
+                {/* Checkout */}
                 <NextIntlClientProvider locale={locale} messages={messages}>
                   <CheckoutPanel
                     tableToken={token!}
@@ -254,16 +259,18 @@ export default async function PayPage({
                 </NextIntlClientProvider>
               </>
             ) : recentPaidBill ? (
-              <Card>
-                <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-green-600" />
+              <Card className="mt-4 border-border/60">
+                <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    <CheckCircle2 className="h-8 w-8 text-primary" />
+                  </div>
                   <p className="text-base font-semibold">{t("success")}</p>
-                  <div className="w-full rounded-md border bg-muted/40 px-3 py-2">
+                  <div className="w-full rounded-xl bg-muted/50 p-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
                         {t("paidAmount")}
                       </span>
-                      <span className="font-semibold">
+                      <span className="font-semibold tabular">
                         {formatMoney(
                           recentPaidBill.totalMinor,
                           recentPaidBill.currency,
@@ -272,16 +279,18 @@ export default async function PayPage({
                       </span>
                     </div>
                   </div>
-                  <p className="max-w-xs text-xs text-muted-foreground">
+                  <p className="max-w-xs text-[11px] text-muted-foreground">
                     {t("successNote")}
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <Card className="flex-1">
-                <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                  <QrCode className="h-10 w-10 text-muted-foreground" />
-                  <p className="text-base font-medium">{t("noActiveBill")}</p>
+              <Card className="mt-4 border-border/60">
+                <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+                  <QrCode className="h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-base font-medium">
+                    {t("noActiveBill")}
+                  </p>
                   <p className="max-w-xs text-sm text-muted-foreground">
                     {t("noActiveBillDescription")}
                   </p>
@@ -292,8 +301,8 @@ export default async function PayPage({
         )}
       </section>
 
-      <footer className="border-t">
-        <div className="mx-auto w-full max-w-md p-4 text-center text-xs text-muted-foreground">
+      <footer className="border-t border-border/60">
+        <div className="mx-auto w-full max-w-md px-4 py-3 text-center text-[11px] text-muted-foreground">
           {t("poweredBy")}
         </div>
       </footer>

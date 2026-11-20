@@ -31,6 +31,7 @@
     "success": "Payment confirmed!",
     "successNote": "Thank you. The restaurant has been notified of your payment.",
     "paidAmount": "Amount paid",
+    "reference": "Reference",
     "errorGeneric": "A payment error occurred",
     "paymentFailed": "The payment did not complete.",
     "retry": "Try again",
