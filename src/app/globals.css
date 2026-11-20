@@ -3,6 +3,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =========================================================================
+   ROHI DESIGN SYSTEM
+   =========================================================================
+   - Default (:root) = DARK navy/charcoal admin theme.
+   - .theme-light     = warm-neutral light theme (guest /pay checkout).
+   - Accent: restrained emerald green for payments/success/primary actions.
+   ========================================================================= */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -43,73 +51,85 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ---- DARK (default admin theme) ---- */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+
+  /* navy-charcoal base */
+  --background: oklch(0.16 0.013 255);
+  --foreground: oklch(0.96 0.004 255);
+  --card: oklch(0.205 0.013 255);
+  --card-foreground: oklch(0.96 0.004 255);
+  --popover: oklch(0.205 0.013 255);
+  --popover-foreground: oklch(0.96 0.004 255);
+
+  /* restrained emerald green accent */
+  --primary: oklch(0.62 0.16 150);
+  --primary-foreground: oklch(0.14 0.02 150);
+
+  --secondary: oklch(0.26 0.01 255);
+  --secondary-foreground: oklch(0.96 0.004 255);
+  --muted: oklch(0.24 0.01 255);
+  --muted-foreground: oklch(0.66 0.01 255);
+  --accent: oklch(0.28 0.012 255);
+  --accent-foreground: oklch(0.96 0.004 255);
+  --destructive: oklch(0.62 0.21 25);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.62 0.16 150);
+
+  /* chart palette: green-led, warm companions */
+  --chart-1: oklch(0.62 0.16 150); /* emerald — revenue/success */
+  --chart-2: oklch(0.7 0.15 65); /* amber */
+  --chart-3: oklch(0.65 0.18 45); /* orange */
+  --chart-4: oklch(0.6 0.1 195); /* muted teal */
+  --chart-5: oklch(0.62 0.2 15); /* rose — failed/negative */
+
+  /* sidebar: a touch darker than the main canvas */
+  --sidebar: oklch(0.135 0.013 255);
+  --sidebar-foreground: oklch(0.96 0.004 255);
+  --sidebar-primary: oklch(0.62 0.16 150);
+  --sidebar-primary-foreground: oklch(0.14 0.02 150);
+  --sidebar-accent: oklch(0.23 0.012 255);
+  --sidebar-accent-foreground: oklch(0.96 0.004 255);
+  --sidebar-border: oklch(1 0 0 / 6%);
+  --sidebar-ring: oklch(0.62 0.16 150);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* ---- LIGHT (guest /pay checkout) ---- */
+.theme-light {
+  --radius: 0.875rem;
+  --background: oklch(0.985 0.003 75);
+  --foreground: oklch(0.2 0.01 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 255);
+  --primary: oklch(0.55 0.16 150);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.96 0.004 75);
+  --secondary-foreground: oklch(0.2 0.01 255);
+  --muted: oklch(0.965 0.004 75);
+  --muted-foreground: oklch(0.5 0.01 255);
+  --accent: oklch(0.965 0.004 75);
+  --accent-foreground: oklch(0.2 0.01 255);
+  --destructive: oklch(0.55 0.21 25);
+  --border: oklch(0.92 0.004 75);
+  --input: oklch(0.92 0.004 75);
+  --ring: oklch(0.55 0.16 150);
+  --chart-1: oklch(0.55 0.16 150);
+  --chart-2: oklch(0.68 0.15 65);
+  --chart-3: oklch(0.62 0.18 45);
+  --chart-4: oklch(0.55 0.1 195);
+  --chart-5: oklch(0.55 0.2 15);
+  --sidebar: oklch(0.985 0.003 75);
+  --sidebar-foreground: oklch(0.2 0.01 255);
+  --sidebar-primary: oklch(0.55 0.16 150);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.965 0.004 75);
+  --sidebar-accent-foreground: oklch(0.2 0.01 255);
+  --sidebar-border: oklch(0.92 0.004 75);
+  --sidebar-ring: oklch(0.55 0.16 150);
 }
 
 @layer base {
@@ -117,6 +137,47 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+  /* tabular numbers for all money/data figures */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  /* refined custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(1 0 0 / 12%);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(1 0 0 / 20%);
+    background-clip: padding-box;
+  }
+}
+
+/* subtle entrance animation for cards/sections */
+@keyframes rohi-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: rohi-fade-up 0.35s ease-out both;
 }
