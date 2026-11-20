@@ -177,6 +177,7 @@ model Restaurant {
   floorPlans   FloorPlan[]
   menuCategories MenuCategory[]
   products     Product[]
+  customerOrders CustomerOrder[]
   bills        Bill[]
   payments     Payment[]
   staff        RestaurantStaff[]
@@ -262,6 +263,7 @@ model RestaurantTable {
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   floorArea  Area?       @relation("AreaTables", fields: [areaId], references: [id], onDelete: SetNull)
   bills      Bill[]     @relation("TableBills")
+  customerOrders CustomerOrder[]
 
   // Active bill is resolved by query (Bill where tableId + status in
   // [OPEN, PENDING_PAYMENT]) rather than a stored pointer, to avoid sync bugs.
@@ -336,6 +338,42 @@ model Product {
 
   @@index([restaurantId, categoryId])
   @@index([restaurantId, available])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// QR Customer Orders (optional ordering → feeds into the canonical bill)
+// ────────────────────────────────────────────────────────────────────────────
+
+model CustomerOrder {
+  id           String   @id @default(cuid())
+  restaurantId String
+  tableId      String
+  status       String   @default("SUBMITTED") // SUBMITTED | RECEIVED | ACCEPTED | PREPARING | READY | SERVED | CANCELLED | REJECTED
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      RestaurantTable  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  items      CustomerOrderItem[]
+
+  @@index([restaurantId, status])
+  @@index([tableId, status])
+}
+
+model CustomerOrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       String?  // nullable snapshot (product may be deleted later)
+  name            String   // snapshot of product name at order time
+  quantity        Int      @default(1)
+  unitPriceMinor  Int      // snapshot of price at order time
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
