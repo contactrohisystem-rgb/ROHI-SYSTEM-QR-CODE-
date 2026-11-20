@@ -1,0 +1,564 @@
+Sound and Mdedia@DESKTOP-078RGP6 MINGW64 ~/Downloads/ROHI (main)
+$ npm run dev
+
+> rohi@0.1.0 dev
+> next dev -p 3000 2>&1 | tee dev.log
+
+▲ Next.js 16.4.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.88.10:3000
+- Environments: .env
+✓ Ready in 778ms
+✓ Running next.config.ts took 83ms
+
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+prisma:query SELECT `main`.`RestaurantTable`.`id`, `main`.`RestaurantTable`.`restaurantId`, `main`.`RestaurantTable`.`label`, `main`.`RestaurantTable`.`area`, `main`.`RestaurantTable`.`token`, `main`.`RestaurantTable`.`status`, `main`.`RestaurantTable`.`posX`, `main`.`RestaurantTable`.`posY`, `main`.`RestaurantTable`.`shape`, `main`.`RestaurantTable`.`seats`, `main`.`RestaurantTable`.`width`, `main`.`RestaurantTable`.`height`, `main`.`RestaurantTable`.`rotation`, `main`.`RestaurantTable`.`createdAt`, `main`.`RestaurantTable`.`updatedAt` FROM `main`.`RestaurantTable` WHERE (`main`.`RestaurantTable`.`token` = ? AND 1=1) LIMIT ? OFFSET ?
+ GET /pay?table=tbl_5e8e8af238646ccbc999ec7b7ad423bf 200 in 610ms (next.js: 284ms, application-code: 326ms)
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+prisma:query SELECT `main`.`PosSyncRecord`.`id` FROM `main`.`PosSyncRecord` WHERE (`main`.`PosSyncRecord`.`status` IN (?,?) AND (`main`.`PosSyncRecord`.`nextAttemptAt` IS NULL OR `main`.`PosSyncRecord`.`nextAttemptAt` <= ?)) ORDER BY `main`.`PosSyncRecord`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`status` IN (?,?) AND `main`.`Payment`.`initiatedAt` < ? AND `main`.`Payment`.`providerPaymentId` IS NOT NULL) ORDER BY `main`.`Payment`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`PosSyncRecord`.`id` FROM `main`.`PosSyncRecord` WHERE (`main`.`PosSyncRecord`.`status` IN (?,?) AND (`main`.`PosSyncRecord`.`nextAttemptAt` IS NULL OR `main`.`PosSyncRecord`.`nextAttemptAt` <= ?)) ORDER BY `main`.`PosSyncRecord`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`status` IN (?,?) AND `main`.`Payment`.`initiatedAt` < ? AND `main`.`Payment`.`providerPaymentId` IS NOT NULL) ORDER BY `main`.`Payment`.`id` ASC LIMIT ? OFFSET ?
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+prisma:query SELECT 1
+prisma:query SELECT `main`.`RestaurantStaff`.`id`, `main`.`RestaurantStaff`.`userId`, `main`.`RestaurantStaff`.`restaurantId`, `main`.`RestaurantStaff`.`role`, `main`.`RestaurantStaff`.`createdAt` FROM `main`.`RestaurantStaff` WHERE `main`.`RestaurantStaff`.`userId` = ? ORDER BY `main`.`RestaurantStaff`.`createdAt` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`name`, `main`.`Restaurant`.`status`, `main`.`Restaurant`.`brandPrimary`, `main`.`Restaurant`.`brandSecondary`, `main`.`Restaurant`.`brandAccent`, `main`.`Restaurant`.`logoUrl`, `main`.`Restaurant`.`appearance` FROM `main`.`Restaurant` WHERE `main`.`Restaurant`.`id` IN (?,?,?) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`RestaurantTable`.`id`, `main`.`RestaurantTable`.`restaurantId`, `main`.`RestaurantTable`.`label`, `main`.`RestaurantTable`.`area`, `main`.`RestaurantTable`.`token`, `main`.`RestaurantTable`.`status`, `main`.`RestaurantTable`.`posX`, `main`.`RestaurantTable`.`posY`, `main`.`RestaurantTable`.`shape`, `main`.`RestaurantTable`.`seats`, `main`.`RestaurantTable`.`width`, `main`.`RestaurantTable`.`height`, `main`.`RestaurantTable`.`rotation`, `main`.`RestaurantTable`.`createdAt`, `main`.`RestaurantTable`.`updatedAt` FROM `main`.`RestaurantTable` WHERE `main`.`RestaurantTable`.`restaurantId` = ? ORDER BY `main`.`RestaurantTable`.`area` ASC, `main`.`RestaurantTable`.`label` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Bill`.`id`, `main`.`Bill`.`totalMinor`, `main`.`Bill`.`currency`, `main`.`Bill`.`tableId` FROM `main`.`Bill` WHERE (`main`.`Bill`.`status` = ? AND `main`.`Bill`.`tableId` IN (?,?,?,?)) ORDER BY `main`.`Bill`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`billId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`billId` IN (?) AND `main`.`Payment`.`status` IN (?,?)) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`currency` FROM `main`.`Restaurant` WHERE (`main`.`Restaurant`.`id` = ? AND 1=1) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`restaurantId`, `main`.`Payment`.`billId`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId`, `main`.`Payment`.`status`, `main`.`Payment`.`amountMinor`, `main`.`Payment`.`currency`, `main`.`Payment`.`idempotencyKey`, `main`.`Payment`.`customerIdentifier`, `main`.`Payment`.`initiatedAt`, `main`.`Payment`.`confirmedAt`, `main`.`Payment`.`failedReason`, `main`.`Payment`.`rawProviderPayload`, `main`.`Payment`.`createdAt`, `main`.`Payment`.`updatedAt` FROM `main`.`Payment` WHERE `main`.`Payment`.`restaurantId` = ? ORDER BY `main`.`Payment`.`createdAt` DESC LIMIT ? OFFSET ?
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Bill`.`id` FROM `main`.`Bill` WHERE (`main`.`Bill`.`restaurantId` = ? AND `main`.`Bill`.`status` = ?) LIMIT ? OFFSET ?) AS `sub`
+ GET / 200 in 660ms (next.js: 111ms, application-code: 549ms)
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+[next-auth][warn][NEXTAUTH_URL] 
+https://next-auth.js.org/warnings#nextauth_url
+prisma:query SELECT `main`.`RestaurantStaff`.`id`, `main`.`RestaurantStaff`.`userId`, `main`.`RestaurantStaff`.`restaurantId`, `main`.`RestaurantStaff`.`role`, `main`.`RestaurantStaff`.`createdAt` FROM `main`.`RestaurantStaff` WHERE `main`.`RestaurantStaff`.`userId` = ? ORDER BY `main`.`RestaurantStaff`.`createdAt` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`name`, `main`.`Restaurant`.`status`, `main`.`Restaurant`.`brandPrimary`, `main`.`Restaurant`.`brandSecondary`, `main`.`Restaurant`.`brandAccent`, `main`.`Restaurant`.`logoUrl`, `main`.`Restaurant`.`appearance` FROM `main`.`Restaurant` WHERE `main`.`Restaurant`.`id` IN (?,?,?) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`RestaurantStaff`.`id`, `main`.`RestaurantStaff`.`userId`, `main`.`RestaurantStaff`.`restaurantId`, `main`.`RestaurantStaff`.`role`, `main`.`RestaurantStaff`.`createdAt` FROM `main`.`RestaurantStaff` WHERE ((`main`.`RestaurantStaff`.`userId` = ? AND `main`.`RestaurantStaff`.`restaurantId` = ?) AND 1=1) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`name`, `main`.`Restaurant`.`status` FROM `main`.`Restaurant` WHERE `main`.`Restaurant`.`id` IN (?) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`RestaurantTable`.`id` FROM `main`.`RestaurantTable` WHERE (`main`.`RestaurantTable`.`id` = ? AND `main`.`RestaurantTable`.`restaurantId` = ?) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Bill`.`id`, `main`.`Bill`.`restaurantId`, `main`.`Bill`.`tableId`, `main`.`Bill`.`source`, `main`.`Bill`.`status`, `main`.`Bill`.`externalPosBillId`, `main`.`Bill`.`subtotalMinor`, `main`.`Bill`.`adjustmentTotalMinor`, `main`.`Bill`.`totalMinor`, `main`.`Bill`.`currency`, `main`.`Bill`.`openedAt`, `main`.`Bill`.`closedAt`, `main`.`Bill`.`voidedAt`, `main`.`Bill`.`notes`, `main`.`Bill`.`createdAt`, `main`.`Bill`.`updatedAt` FROM `main`.`Bill` WHERE (`main`.`Bill`.`tableId` = ? AND `main`.`Bill`.`status` = ?) ORDER BY `main`.`Bill`.`openedAt` DESC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`BillItem`.`id`, `main`.`BillItem`.`billId`, `main`.`BillItem`.`name`, `main`.`BillItem`.`quantity`, `main`.`BillItem`.`unitPriceMinor`, `main`.`BillItem`.`totalMinor`, `main`.`BillItem`.`posExternalId`, `main`.`BillItem`.`createdAt`, `main`.`BillItem`.`updatedAt` FROM `main`.`BillItem` WHERE `main`.`BillItem`.`billId` IN (?) ORDER BY `main`.`BillItem`.`createdAt` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`BillAdjustment`.`id`, `main`.`BillAdjustment`.`billId`, `main`.`BillAdjustment`.`type`, `main`.`BillAdjustment`.`label`, `main`.`BillAdjustment`.`amountMinor`, `main`.`BillAdjustment`.`createdAt` FROM `main`.`BillAdjustment` WHERE `main`.`BillAdjustment`.`billId` IN (?) ORDER BY `main`.`BillAdjustment`.`createdAt` ASC LIMIT ? OFFSET ?
+ GET /api/tables/cmwp2hxqn003nu0i81esywjz8/bills/active 200 in 1260ms (next.js: 1179ms, application-code: 80ms)
+prisma:query SELECT `main`.`PosSyncRecord`.`id` FROM `main`.`PosSyncRecord` WHERE (`main`.`PosSyncRecord`.`status` IN (?,?) AND (`main`.`PosSyncRecord`.`nextAttemptAt` IS NULL OR `main`.`PosSyncRecord`.`nextAttemptAt` <= ?)) ORDER BY `main`.`PosSyncRecord`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`status` IN (?,?) AND `main`.`Payment`.`initiatedAt` < ? AND `main`.`Payment`.`providerPaymentId` IS NOT NULL) ORDER BY `main`.`Payment`.`id` ASC LIMIT ? OFFSET ?
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+prisma:query SELECT 1
+prisma:query SELECT `main`.`RestaurantStaff`.`id`, `main`.`RestaurantStaff`.`userId`, `main`.`RestaurantStaff`.`restaurantId`, `main`.`RestaurantStaff`.`role`, `main`.`RestaurantStaff`.`createdAt` FROM `main`.`RestaurantStaff` WHERE `main`.`RestaurantStaff`.`userId` = ? ORDER BY `main`.`RestaurantStaff`.`createdAt` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`name`, `main`.`Restaurant`.`status`, `main`.`Restaurant`.`brandPrimary`, `main`.`Restaurant`.`brandSecondary`, `main`.`Restaurant`.`brandAccent`, `main`.`Restaurant`.`logoUrl`, `main`.`Restaurant`.`appearance` FROM `main`.`Restaurant` WHERE `main`.`Restaurant`.`id` IN (?,?,?) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`RestaurantStaff`.`id`, `main`.`RestaurantStaff`.`userId`, `main`.`RestaurantStaff`.`restaurantId`, `main`.`RestaurantStaff`.`role`, `main`.`RestaurantStaff`.`createdAt` FROM `main`.`RestaurantStaff` WHERE ((`main`.`RestaurantStaff`.`userId` = ? AND `main`.`RestaurantStaff`.`restaurantId` = ?) AND 1=1) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`name`, `main`.`Restaurant`.`status` FROM `main`.`Restaurant` WHERE `main`.`Restaurant`.`id` IN (?) LIMIT ? OFFSET ?
+prisma:query INSERT INTO `main`.`RestaurantTable` (`id`, `restaurantId`, `label`, `area`, `token`, `status`, `posX`, `posY`, `shape`, `seats`, `width`, `height`, `rotation`, `createdAt`, `updatedAt`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING `id` AS `id`, `restaurantId` AS `restaurantId`, `label` AS `label`, `area` AS `area`, `token` AS `token`, `status` AS `status`, `posX` AS `posX`, `posY` AS `posY`, `shape` AS `shape`, `seats` AS `seats`, `width` AS `width`, `height` AS `height`, `rotation` AS `rotation`, `createdAt` AS `createdAt`, `updatedAt` AS `updatedAt`
+ POST /api/tables 201 in 312ms (next.js: 209ms, application-code: 103ms)
+⚠ ./src/lib/payments/providers/mock.ts:2:1
+Warning: A Node.js module is loaded ('node:crypto' at line 2) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { PaymentStatus } from "@prisma/client";
+> 2 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import type {
+  4 |   PaymentProvider,
+  5 |   InitiatePaymentParams,
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/providers/mock.ts
+    ./src/lib/payments/registry.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/payments/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PaymentProviderCode, PaymentStatus } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getProvider } from "./registry";
+  5 | import type { VerifyPaymentResult } from "./provider";
+  6 | import { BillingError } from "@/lib/billing";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/payments/service.ts
+    ./src/lib/payments/reconciliation.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+⚠ ./src/lib/pos/service.ts:3:1
+Warning: A Node.js module is loaded ('node:crypto' at line 3) which is not supported in the Edge Runtime.
+    Learn More: https://nextjs.org/docs/messages/node-module-in-edge-runtime
+  1 | import { db } from "@/lib/db";
+  2 | import { PosAdapterCode } from "@prisma/client";
+> 3 | import { randomBytes } from "node:crypto";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  4 | import { getAdapter } from "./registry";
+  5 | import { recomputeBillTotals } from "@/lib/billing";
+  6 | import { setMockPosFailure, getMockPosFailure } from "./adapters/mock";
+
+Ecmascript file had an error
+
+Import trace:
+  Edge Instrumentation:
+    ./src/lib/pos/service.ts
+    ./src/lib/worker.ts
+    ./src/instrumentation.ts
+
+
+prisma:query SELECT `main`.`RestaurantStaff`.`id`, `main`.`RestaurantStaff`.`userId`, `main`.`RestaurantStaff`.`restaurantId`, `main`.`RestaurantStaff`.`role`, `main`.`RestaurantStaff`.`createdAt` FROM `main`.`RestaurantStaff` WHERE `main`.`RestaurantStaff`.`userId` = ? ORDER BY `main`.`RestaurantStaff`.`createdAt` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`name`, `main`.`Restaurant`.`status`, `main`.`Restaurant`.`brandPrimary`, `main`.`Restaurant`.`brandSecondary`, `main`.`Restaurant`.`brandAccent`, `main`.`Restaurant`.`logoUrl`, `main`.`Restaurant`.`appearance` FROM `main`.`Restaurant` WHERE `main`.`Restaurant`.`id` IN (?,?,?) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`RestaurantTable`.`id`, `main`.`RestaurantTable`.`restaurantId`, `main`.`RestaurantTable`.`label`, `main`.`RestaurantTable`.`area`, `main`.`RestaurantTable`.`token`, `main`.`RestaurantTable`.`status`, `main`.`RestaurantTable`.`posX`, `main`.`RestaurantTable`.`posY`, `main`.`RestaurantTable`.`shape`, `main`.`RestaurantTable`.`seats`, `main`.`RestaurantTable`.`width`, `main`.`RestaurantTable`.`height`, `main`.`RestaurantTable`.`rotation`, `main`.`RestaurantTable`.`createdAt`, `main`.`RestaurantTable`.`updatedAt` FROM `main`.`RestaurantTable` WHERE `main`.`RestaurantTable`.`restaurantId` = ? ORDER BY `main`.`RestaurantTable`.`area` ASC, `main`.`RestaurantTable`.`label` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Bill`.`id`, `main`.`Bill`.`totalMinor`, `main`.`Bill`.`currency`, `main`.`Bill`.`tableId` FROM `main`.`Bill` WHERE (`main`.`Bill`.`status` = ? AND `main`.`Bill`.`tableId` IN (?,?,?,?,?)) ORDER BY `main`.`Bill`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`billId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`billId` IN (?) AND `main`.`Payment`.`status` IN (?,?)) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Restaurant`.`id`, `main`.`Restaurant`.`currency` FROM `main`.`Restaurant` WHERE (`main`.`Restaurant`.`id` = ? AND 1=1) LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`restaurantId`, `main`.`Payment`.`billId`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId`, `main`.`Payment`.`status`, `main`.`Payment`.`amountMinor`, `main`.`Payment`.`currency`, `main`.`Payment`.`idempotencyKey`, `main`.`Payment`.`customerIdentifier`, `main`.`Payment`.`initiatedAt`, `main`.`Payment`.`confirmedAt`, `main`.`Payment`.`failedReason`, `main`.`Payment`.`rawProviderPayload`, `main`.`Payment`.`createdAt`, `main`.`Payment`.`updatedAt` FROM `main`.`Payment` WHERE `main`.`Payment`.`restaurantId` = ? ORDER BY `main`.`Payment`.`createdAt` DESC LIMIT ? OFFSET ?
+prisma:query SELECT COUNT(*) AS `_count$_all` FROM (SELECT `main`.`Bill`.`id` FROM `main`.`Bill` WHERE (`main`.`Bill`.`restaurantId` = ? AND `main`.`Bill`.`status` = ?) LIMIT ? OFFSET ?) AS `sub`
+ GET / 200 in 278ms (next.js: 21ms, application-code: 257ms)
+prisma:query SELECT `main`.`PosSyncRecord`.`id` FROM `main`.`PosSyncRecord` WHERE (`main`.`PosSyncRecord`.`status` IN (?,?) AND (`main`.`PosSyncRecord`.`nextAttemptAt` IS NULL OR `main`.`PosSyncRecord`.`nextAttemptAt` <= ?)) ORDER BY `main`.`PosSyncRecord`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`status` IN (?,?) AND `main`.`Payment`.`initiatedAt` < ? AND `main`.`Payment`.`providerPaymentId` IS NOT NULL) ORDER BY `main`.`Payment`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT 1
+prisma:query SELECT `main`.`PosSyncRecord`.`id` FROM `main`.`PosSyncRecord` WHERE (`main`.`PosSyncRecord`.`status` IN (?,?) AND (`main`.`PosSyncRecord`.`nextAttemptAt` IS NULL OR `main`.`PosSyncRecord`.`nextAttemptAt` <= ?)) ORDER BY `main`.`PosSyncRecord`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`status` IN (?,?) AND `main`.`Payment`.`initiatedAt` < ? AND `main`.`Payment`.`providerPaymentId` IS NOT NULL) ORDER BY `main`.`Payment`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT 1
+prisma:query SELECT `main`.`PosSyncRecord`.`id` FROM `main`.`PosSyncRecord` WHERE (`main`.`PosSyncRecord`.`status` IN (?,?) AND (`main`.`PosSyncRecord`.`nextAttemptAt` IS NULL OR `main`.`PosSyncRecord`.`nextAttemptAt` <= ?)) ORDER BY `main`.`PosSyncRecord`.`id` ASC LIMIT ? OFFSET ?
+prisma:query SELECT `main`.`Payment`.`id`, `main`.`Payment`.`providerCode`, `main`.`Payment`.`providerPaymentId` FROM `main`.`Payment` WHERE (`main`.`Payment`.`status` IN (?,?) AND `main`.`Payment`.`initiatedAt` < ? AND `main`.`Payment`.`providerPaymentId` IS NOT NULL) ORDER BY `main`.`Payment`.`id` ASC LIMIT ? OFFSET ?

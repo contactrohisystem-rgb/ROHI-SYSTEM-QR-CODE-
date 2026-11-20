@@ -116,15 +116,27 @@ async function main() {
   await db.bill.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
   await db.restaurantTable.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
   await db.posConnection.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
+  await db.area.deleteMany({ where: { floorPlan: { restaurantId: RESTAURANT_ID } } });
+  await db.floorPlan.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
 
   // --- Tables ---
   const tableMap = new Map<string, string>();
+  // Create floor plan + areas for restaurant 1.
+  const fp1 = await db.floorPlan.create({
+    data: { restaurantId: RESTAURANT_ID, name: "Piso Único", sortOrder: 0 },
+  });
+  const areaMap1 = new Map<string, string>();
+  for (const areaName of ["Interior", "Terraço", "VIP"]) {
+    const a = await db.area.create({ data: { floorPlanId: fp1.id, name: areaName, sortOrder: areaMap1.size } });
+    areaMap1.set(areaName, a.id);
+  }
   for (const t of TABLES) {
     const created = await db.restaurantTable.create({
       data: {
         restaurantId: RESTAURANT_ID,
         label: t.label,
         area: t.area,
+        areaId: areaMap1.get(t.area) ?? null,
         token: generateOpaqueToken("tbl", 16),
         status: "AVAILABLE",
         shape: t.shape,
@@ -296,23 +308,33 @@ async function main() {
     update: {},
     create: { userId: OWNER_ID, restaurantId: RESTAURANT_2_ID, role: "OWNER" },
   });
-  // Second restaurant's floor plan (3 tables, different layout).
+  // Second restaurant's floor plan + areas + tables.
   await db.posSyncRecord.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
   await db.payment.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
   await db.bill.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
   await db.restaurantTable.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  await db.area.deleteMany({ where: { floorPlan: { restaurantId: RESTAURANT_2_ID } } });
+  await db.floorPlan.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  const fp2 = await db.floorPlan.create({ data: { restaurantId: RESTAURANT_2_ID, name: "Piso Único", sortOrder: 0 } });
+  const areaMap2 = new Map<string, string>();
+  for (const areaName of ["Esplanada", "Interior"]) {
+    const a = await db.area.create({ data: { floorPlanId: fp2.id, name: areaName, sortOrder: areaMap2.size } });
+    areaMap2.set(areaName, a.id);
+  }
   const r2Tables = [
-    { label: "T1", area: "Esplanada", shape: "round", seats: 2, posX: 25, posY: 30 },
-    { label: "T2", area: "Esplanada", shape: "round", seats: 4, posX: 60, posY: 35 },
-    { label: "T3", area: "Interior", shape: "square", seats: 2, posX: 40, posY: 50 },
+    { label: "T1", area: "Esplanada", shape: "round", seats: 2, posX: 25, posY: 30, width: 64, height: 64, rotation: 0 },
+    { label: "T2", area: "Esplanada", shape: "round", seats: 4, posX: 60, posY: 35, width: 64, height: 64, rotation: 0 },
+    { label: "T3", area: "Interior", shape: "square", seats: 2, posX: 40, posY: 50, width: 54, height: 54, rotation: 0 },
   ];
   const r2TableMap = new Map<string, string>();
   for (const t of r2Tables) {
     const created = await db.restaurantTable.create({
       data: {
         restaurantId: RESTAURANT_2_ID, label: t.label, area: t.area,
+        areaId: areaMap2.get(t.area) ?? null,
         token: generateOpaqueToken("tbl", 16), status: "AVAILABLE",
         shape: t.shape, seats: t.seats, posX: t.posX, posY: t.posY,
+        width: t.width, height: t.height, rotation: t.rotation,
       },
     });
     r2TableMap.set(t.label, created.id);
@@ -374,6 +396,14 @@ async function main() {
   await db.payment.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
   await db.bill.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
   await db.restaurantTable.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  await db.area.deleteMany({ where: { floorPlan: { restaurantId: RESTAURANT_3_ID } } });
+  await db.floorPlan.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  const fp3 = await db.floorPlan.create({ data: { restaurantId: RESTAURANT_3_ID, name: "Skybar", sortOrder: 0 } });
+  const areaMap3 = new Map<string, string>();
+  for (const areaName of ["Bar", "Lounge"]) {
+    const a = await db.area.create({ data: { floorPlanId: fp3.id, name: areaName, sortOrder: areaMap3.size } });
+    areaMap3.set(areaName, a.id);
+  }
   const r3Tables = [
     { label: "Bar 1", area: "Bar", shape: "rect", seats: 8, posX: 30, posY: 35, width: 120, height: 40, rotation: 0 },
     { label: "Bar 2", area: "Bar", shape: "rect", seats: 6, posX: 65, posY: 30, width: 100, height: 40, rotation: 0 },
@@ -384,6 +414,7 @@ async function main() {
     await db.restaurantTable.create({
       data: {
         restaurantId: RESTAURANT_3_ID, label: t.label, area: t.area,
+        areaId: areaMap3.get(t.area) ?? null,
         token: generateOpaqueToken("tbl", 16), status: "AVAILABLE",
         shape: t.shape, seats: t.seats, posX: t.posX, posY: t.posY,
         width: t.width, height: t.height, rotation: t.rotation,
