@@ -22,6 +22,7 @@ import { FloorPlanSection } from "@/components/floor-plan/floor-plan-section";
 import { BillingSection } from "@/components/billing/billing-section";
 import { PaymentsSection, type TransactionView } from "@/components/payments/payments-section";
 import { SettingsSection } from "@/components/settings/settings-section";
+import { MenuSection } from "@/components/menu/menu-section";
 import { BrandTheme } from "@/components/app/brand-theme";
 import { RestaurantSwitcher } from "@/components/app/restaurant-switcher";
 import type { RestaurantBrand } from "@/lib/brand";
@@ -38,6 +39,7 @@ type SectionId =
   | "floor-plan"
   | "tables"
   | "billing"
+  | "menu"
   | "payments"
   | "pos"
   | "settings";
@@ -54,6 +56,7 @@ const NAV: NavItem[] = [
   { id: "floor-plan", label: "Floor Plan", icon: Map, stage: "3" },
   { id: "tables", label: "Tables & QR", icon: Table2, stage: "4" },
   { id: "billing", label: "Billing", icon: Receipt, stage: "5" },
+  { id: "menu", label: "Menu", icon: Utensils, stage: "11" },
   { id: "payments", label: "Payments", icon: CreditCard, stage: "6" },
   { id: "pos", label: "POS Sync", icon: Plug, stage: "8" },
   { id: "settings", label: "Settings", icon: Settings, stage: "10" },
@@ -64,6 +67,7 @@ const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string }> = {
   "floor-plan": { title: "Floor Plan", subtitle: "Interactive restaurant layout" },
   tables: { title: "Tables & QR", subtitle: "Manage tables and QR codes" },
   billing: { title: "Billing", subtitle: "Open bills and lightweight POS" },
+  menu: { title: "Menu", subtitle: "Categories and products" },
   payments: { title: "Payments", subtitle: "Transaction history and status" },
   pos: { title: "POS Synchronisation", subtitle: "POS connection and sync records" },
   settings: { title: "Settings", subtitle: "Restaurant, staff and configuration" },
@@ -277,6 +281,7 @@ export function DashboardShell({
             {active === "billing" && (
               <BillingSection tables={tables} canManage={canManage} />
             )}
+            {active === "menu" && <MenuSection />}
             {active === "payments" && (
               <PaymentsSection transactions={transactions} />
             )}

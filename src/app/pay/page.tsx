@@ -9,6 +9,7 @@ import { LangToggle } from "@/components/lang-toggle";
 import { getActiveBillForTable } from "@/lib/billing";
 import { formatMoney } from "@/lib/money";
 import { CheckoutPanel } from "@/components/payments/checkout-panel";
+import { GuestMenuView } from "@/components/payments/guest-menu-view";
 import { brandCssVars } from "@/lib/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -28,13 +29,14 @@ const RECENT_PAID_WINDOW_MS = 30 * 60 * 1000;
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ table?: string }>;
+  searchParams: Promise<{ table?: string; tab?: string }>;
 }) {
   const t = await getTranslations("GuestPay");
   const locale = await getLocale();
   const moneyLocale = locale === "en" ? "en" : "pt";
   const messages = await getMessages();
-  const { table: token } = await searchParams;
+  const { table: token, tab } = await searchParams;
+  const showMenu = tab === "menu";
 
   const table = token
     ? await db.restaurantTable.findUnique({
@@ -154,7 +156,40 @@ export default async function PayPage({
               </div>
             </div>
 
-            {activeBill ? (
+            {/* Tab bar: Bill | Menu */}
+            {table && (
+              <div className="flex gap-2">
+                <a
+                  href={`/pay?table=${encodeURIComponent(token!)}`}
+                  className={`flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
+                    !showMenu
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {t("bill")}
+                </a>
+                <a
+                  href={`/pay?table=${encodeURIComponent(token!)}&tab=menu`}
+                  className={`flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
+                    showMenu
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {locale === "pt" ? "Menu" : "Menu"}
+                </a>
+              </div>
+            )}
+
+            {/* Menu tab */}
+            {showMenu && table ? (
+              <GuestMenuView
+                tableToken={token!}
+                currency={table.restaurant.brandPrimary ? "MZN" : "MZN"}
+                locale={moneyLocale as "pt" | "en"}
+              />
+            ) : activeBill ? (
               <>
                 {/* Bill */}
                 <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
