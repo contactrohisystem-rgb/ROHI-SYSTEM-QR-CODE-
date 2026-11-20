@@ -126,7 +126,7 @@ function TableNode({
 
   return (
     <div
-      className="absolute touch-none select-none"
+      className="absolute touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
       style={{
         left: `${posX}%`,
         top: `${posY}%`,
@@ -134,10 +134,21 @@ function TableNode({
         zIndex: selected || dragging ? 30 : 10,
         cursor: dragging ? "grabbing" : "grab",
       }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${table.label} — ${st.label}`}
+      aria-pressed={selected}
       onPointerDown={onPointerDown}
       onClick={(e) => {
         e.stopPropagation();
         if (!dragging) onSelect();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect();
+        }
       }}
     >
       <div className="relative flex items-center justify-center">
