@@ -245,6 +245,10 @@ model RestaurantTable {
   posY         Float       @default(20)
   shape        String      @default("round")
   seats        Int         @default(4)
+  // Advanced editor: per-table dimensions (px) + rotation (degrees).
+  width        Float       @default(64)
+  height       Float       @default(64)
+  rotation     Float       @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 

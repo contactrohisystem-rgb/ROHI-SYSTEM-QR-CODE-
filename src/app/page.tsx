@@ -91,6 +91,9 @@ export default async function Home() {
           seats: t.seats,
           posX: t.posX,
           posY: t.posY,
+          width: t.width,
+          height: t.height,
+          rotation: t.rotation,
           payUrl,
           qrDataUrl: await generateQrDataUrl(payUrl),
           activeBill: ab

@@ -23,13 +23,13 @@ const MANAGER_ID = "demo-manager";
 const DEMO_PASSWORD = "demo1234";
 
 const TABLES = [
-  { label: "Mesa 1", area: "Interior", shape: "round", seats: 4, posX: 20, posY: 30 },
-  { label: "Mesa 2", area: "Interior", shape: "square", seats: 2, posX: 55, posY: 25 },
-  { label: "Mesa 3", area: "Interior", shape: "round", seats: 4, posX: 20, posY: 70 },
-  { label: "Mesa 4", area: "Interior", shape: "rect", seats: 6, posX: 62, posY: 68 },
-  { label: "Mesa 5", area: "Terraço", shape: "round", seats: 4, posX: 30, posY: 35 },
-  { label: "Mesa 6", area: "Terraço", shape: "square", seats: 2, posX: 70, posY: 45 },
-  { label: "Mesa 7", area: "VIP", shape: "round", seats: 6, posX: 45, posY: 45 },
+  { label: "Mesa 1", area: "Interior", shape: "round", seats: 4, posX: 20, posY: 30, width: 64, height: 64, rotation: 0 },
+  { label: "Mesa 2", area: "Interior", shape: "square", seats: 2, posX: 55, posY: 25, width: 54, height: 54, rotation: 0 },
+  { label: "Mesa 3", area: "Interior", shape: "round", seats: 4, posX: 20, posY: 70, width: 64, height: 64, rotation: 0 },
+  { label: "Mesa 4", area: "Interior", shape: "rect", seats: 6, posX: 62, posY: 68, width: 92, height: 54, rotation: 0 },
+  { label: "Mesa 5", area: "Terraço", shape: "round", seats: 4, posX: 30, posY: 35, width: 64, height: 64, rotation: 0 },
+  { label: "Mesa 6", area: "Terraço", shape: "square", seats: 2, posX: 70, posY: 45, width: 54, height: 54, rotation: 0 },
+  { label: "Mesa 7", area: "VIP", shape: "round", seats: 6, posX: 45, posY: 45, width: 80, height: 80, rotation: 0 },
 ];
 
 // Historical paid bills: [daysAgo, amountMinor, tableLabel]
@@ -131,6 +131,9 @@ async function main() {
         seats: t.seats,
         posX: t.posX,
         posY: t.posY,
+        width: t.width,
+        height: t.height,
+        rotation: t.rotation,
       },
     });
     tableMap.set(t.label, created.id);
@@ -342,10 +345,66 @@ async function main() {
     },
   });
 
+  // --- Third demo restaurant (bar/lounge) ---
+  const RESTAURANT_3_ID = "skybar-maputo";
+  const r3 = await db.restaurant.upsert({
+    where: { id: RESTAURANT_3_ID },
+    update: {},
+    create: {
+      id: RESTAURANT_3_ID,
+      name: "Skybar Maputo",
+      currency: "MZN",
+      locale: "pt-MZ",
+      timezone: "Africa/Maputo",
+      status: "active",
+      phone: "+258 841234999",
+      address: "Av. 24 de Julho, Maputo",
+      brandPrimary: "#7c3aed",
+      brandSecondary: "#a78bfa",
+      brandAccent: "#06b6d4",
+      appearance: "dark",
+    },
+  });
+  await db.restaurantStaff.upsert({
+    where: { userId_restaurantId: { userId: OWNER_ID, restaurantId: RESTAURANT_3_ID } },
+    update: {},
+    create: { userId: OWNER_ID, restaurantId: RESTAURANT_3_ID, role: "OWNER" },
+  });
+  await db.posSyncRecord.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  await db.payment.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  await db.bill.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  await db.restaurantTable.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  const r3Tables = [
+    { label: "Bar 1", area: "Bar", shape: "rect", seats: 8, posX: 30, posY: 35, width: 120, height: 40, rotation: 0 },
+    { label: "Bar 2", area: "Bar", shape: "rect", seats: 6, posX: 65, posY: 30, width: 100, height: 40, rotation: 0 },
+    { label: "Lounge 1", area: "Lounge", shape: "round", seats: 4, posX: 25, posY: 60, width: 70, height: 70, rotation: 0 },
+    { label: "Lounge 2", area: "Lounge", shape: "round", seats: 4, posX: 60, posY: 65, width: 70, height: 70, rotation: 0 },
+  ];
+  for (const t of r3Tables) {
+    await db.restaurantTable.create({
+      data: {
+        restaurantId: RESTAURANT_3_ID, label: t.label, area: t.area,
+        token: generateOpaqueToken("tbl", 16), status: "AVAILABLE",
+        shape: t.shape, seats: t.seats, posX: t.posX, posY: t.posY,
+        width: t.width, height: t.height, rotation: t.rotation,
+      },
+    });
+  }
+  // One open bill on Lounge 1.
+  const r3Bill = await db.bill.create({
+    data: {
+      restaurantId: RESTAURANT_3_ID,
+      tableId: (await db.restaurantTable.findFirst({ where: { restaurantId: RESTAURANT_3_ID, label: "Lounge 1" }, select: { id: true } }))!.id,
+      source: "NATIVE", status: "OPEN", currency: "MZN",
+      subtotalMinor: 3500, adjustmentTotalMinor: 0, totalMinor: 3500,
+    },
+  });
+
   console.log("ROHI seed complete.");
   console.log(`  Restaurant 1: ${restaurant.name} (green / dark) — ${TABLES.length} mesas`);
   console.log(`  Restaurant 2: ${r2.name} (orange / light) — ${r2Tables.length} mesas`);
-  console.log(`  Owner belongs to both restaurants (switcher).`);
+  console.log(`  Restaurant 3: ${r3.name} (purple / dark) — ${r3Tables.length} mesas`);
+  console.log(`  Owner belongs to all three restaurants (switcher).`);
   console.log(`  Restaurant: ${restaurant.id} — ${restaurant.name}`);
   console.log(`  Tables: ${TABLES.length} across Interior/Terraço/VIP`);
   console.log(`  Historical payments: ${HISTORY.length} (last 7 days, MockProvider — demo)`);

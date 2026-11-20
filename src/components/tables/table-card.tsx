@@ -29,6 +29,9 @@ export interface TableQrView {
   seats: number;
   posX: number;
   posY: number;
+  width: number;
+  height: number;
+  rotation: number;
   payUrl: string;
   qrDataUrl: string;
   activeBill: ActiveBillSummary | null;
