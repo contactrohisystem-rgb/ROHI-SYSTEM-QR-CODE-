@@ -18,6 +18,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 
+import { DigitalReceipt } from "./guest-extras";
+
 type View =
   | "bill"
   | "method"
@@ -31,6 +33,8 @@ export interface CheckoutBill {
   id: string;
   totalMinor: number;
   currency: string;
+  restaurantName?: string;
+  tableLabel?: string;
 }
 
 /**
@@ -297,6 +301,19 @@ export function CheckoutPanel({
             <p className="max-w-xs text-[11px] leading-relaxed text-muted-foreground">
               {t("successNote")}
             </p>
+            {/* Digital receipt */}
+            {paymentId && (
+              <DigitalReceipt
+                restaurantName={bill.restaurantName ?? "ROHI"}
+                tableLabel={bill.tableLabel ?? "—"}
+                amountMinor={bill.totalMinor}
+                currency={bill.currency}
+                methodLabel={locale === "pt" ? "M-Pesa (Demo)" : "M-Pesa (Demo)"}
+                reference={paymentId.slice(0, 16)}
+                paidAt={new Date().toISOString()}
+                locale={locale}
+              />
+            )}
           </div>
         )}
 

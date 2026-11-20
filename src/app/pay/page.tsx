@@ -10,6 +10,7 @@ import { getActiveBillForTable } from "@/lib/billing";
 import { formatMoney } from "@/lib/money";
 import { CheckoutPanel } from "@/components/payments/checkout-panel";
 import { GuestMenuView } from "@/components/payments/guest-menu-view";
+import { GuestOrderTracking, DigitalReceipt } from "@/components/payments/guest-extras";
 import { brandCssVars } from "@/lib/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -191,6 +192,13 @@ export default async function PayPage({
               />
             ) : activeBill ? (
               <>
+                {/* Order tracking (polls for QR order status) */}
+              <div className="theme-light">
+                <NextIntlClientProvider locale={locale} messages={messages}>
+                  <GuestOrderTracking tableToken={token!} locale={moneyLocale as "pt" | "en"} />
+                </NextIntlClientProvider>
+              </div>
+
                 {/* Bill */}
                 <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
                   <div className="border-b border-border/60 px-4 py-2.5">
@@ -316,6 +324,8 @@ export default async function PayPage({
                       id: activeBill.id,
                       totalMinor: activeBill.totalMinor,
                       currency: activeBill.currency,
+                      restaurantName: table!.restaurant.name,
+                      tableLabel: table!.label,
                     }}
                     locale={moneyLocale as "pt" | "en"}
                   />
