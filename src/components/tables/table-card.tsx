@@ -2,43 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Download,
-  ExternalLink,
-  Loader2,
-  Receipt,
-  Trash2,
-} from "lucide-react";
+import { ExternalLink, QrCode, Receipt, Users } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/money";
 import { BillManager } from "@/components/billing/bill-manager";
+import { QrDetailDialog } from "./qr-detail-dialog";
 
 export interface ActiveBillSummary {
   id: string;
@@ -62,20 +34,23 @@ export interface TableQrView {
   activeBill: ActiveBillSummary | null;
 }
 
-const STATUS_LABEL: Record<TableQrView["status"], string> = {
-  AVAILABLE: "Disponível",
-  OCCUPIED: "Ocupada",
-  RESERVED: "Reservada",
-};
-
-const STATUS_VARIANT: Record<
-  TableQrView["status"],
-  "secondary" | "default" | "outline"
-> = {
-  AVAILABLE: "secondary",
-  OCCUPIED: "default",
-  RESERVED: "outline",
-};
+function cardStatus(t: TableQrView): { label: string; cls: string } {
+  if (t.activeBill?.hasPendingPayment)
+    return {
+      label: "A aguardar pagamento",
+      cls: "bg-[oklch(0.7_0.15_65/0.16)] text-[oklch(0.78_0.15_65)]",
+    };
+  if (t.activeBill)
+    return { label: "Conta aberta", cls: "bg-primary/15 text-primary" };
+  if (t.status === "RESERVED")
+    return {
+      label: "Reservada",
+      cls: "bg-[oklch(0.7_0.15_65/0.14)] text-[oklch(0.78_0.15_65)]",
+    };
+  if (t.status === "OCCUPIED")
+    return { label: "Ocupada", cls: "bg-muted text-muted-foreground" };
+  return { label: "Disponível", cls: "bg-primary/10 text-primary/80" };
+}
 
 export function TableCard({
   table,
@@ -86,231 +61,100 @@ export function TableCard({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [openBillLoading, setOpenBillLoading] = useState(false);
-  const [billDialogOpen, setBillDialogOpen] = useState(false);
-
-  async function updateStatus(status: TableQrView["status"]) {
-    setStatusLoading(true);
-    try {
-      const res = await fetch(`/api/tables/${table.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error();
-      toast({ title: "Estado actualizado" });
-      router.refresh();
-    } catch {
-      toast({ title: "Erro ao actualizar", variant: "destructive" });
-    } finally {
-      setStatusLoading(false);
-    }
-  }
-
-  async function deleteTable() {
-    setDeleteLoading(true);
-    try {
-      const res = await fetch(`/api/tables/${table.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.error === "table_has_bills") {
-          toast({
-            title: "Não é possível eliminar",
-            description: "Esta mesa tem contas associadas.",
-            variant: "destructive",
-          });
-        } else {
-          throw new Error();
-        }
-      } else {
-        toast({ title: "Mesa eliminada" });
-        router.refresh();
-      }
-    } catch {
-      toast({ title: "Erro ao eliminar", variant: "destructive" });
-    } finally {
-      setDeleteLoading(false);
-    }
-  }
-
-  async function openBill() {
-    setOpenBillLoading(true);
-    try {
-      const res = await fetch(`/api/tables/${table.id}/bills`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        if (d.error === "table_already_has_open_bill") {
-          toast({ title: "Já existe uma conta aberta" });
-          router.refresh();
-        } else {
-          throw new Error();
-        }
-      } else {
-        toast({ title: "Conta aberta" });
-        router.refresh();
-      }
-    } catch {
-      toast({ title: "Erro ao abrir conta", variant: "destructive" });
-    } finally {
-      setOpenBillLoading(false);
-    }
-  }
-
-  // When the bill dialog closes, refresh the server-rendered table card so
-  // its total badge reflects any edits made inside the dialog.
-  function handleBillDialogChange(open: boolean) {
-    setBillDialogOpen(open);
-    if (!open) router.refresh();
-  }
+  const [billOpen, setBillOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const st = cardStatus(table);
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-          <div className="space-y-1">
-            <CardTitle className="text-base">{table.label}</CardTitle>
-            {table.area && (
-              <p className="text-xs text-muted-foreground">{table.area}</p>
-            )}
+      <Card className="overflow-hidden transition-shadow hover:shadow-lg">
+        <CardContent className="p-4">
+          {/* header */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold">{table.label}</div>
+              {table.area && (
+                <div className="text-[11px] text-muted-foreground">
+                  {table.area}
+                </div>
+              )}
+            </div>
+            <Badge variant="outline" className="shrink-0 gap-1 text-muted-foreground">
+              <Users className="h-3 w-3" />
+              {table.seats}
+            </Badge>
           </div>
-          <Badge variant={STATUS_VARIANT[table.status]}>
-            {STATUS_LABEL[table.status]}
-          </Badge>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex justify-center rounded-md border bg-white p-2">
+
+          {/* QR thumbnail */}
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="group mt-3 flex w-full flex-col items-center rounded-lg border bg-white p-3 transition-colors hover:border-primary/40"
+            aria-label={`Ver QR de ${table.label}`}
+          >
             <img
               src={table.qrDataUrl}
-              alt={`Código QR para ${table.label}`}
-              className="h-28 w-28"
+              alt={`QR code for ${table.label}`}
+              className="h-24 w-24"
             />
+            <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground group-hover:text-primary">
+              <QrCode className="h-3 w-3" /> Ver QR
+            </span>
+          </button>
+
+          {/* status + bill */}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <Badge variant="secondary" className={st.cls}>
+              {st.label}
+            </Badge>
+            {table.activeBill ? (
+              <span className="text-sm font-semibold tabular text-primary">
+                {formatMoney(
+                  table.activeBill.totalMinor,
+                  table.activeBill.currency,
+                )}
+              </span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">Sem conta</span>
+            )}
           </div>
 
-          {/* Active bill summary + open/view actions */}
-          {table.activeBill ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
-                <div className="flex items-center gap-1.5 text-sm">
-                  <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">Conta aberta</span>
-                </div>
-                <span className="text-sm font-semibold">
-                  {formatMoney(
-                    table.activeBill.totalMinor,
-                    table.activeBill.currency,
-                  )}
-                </span>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                className="w-full"
-                onClick={() => setBillDialogOpen(true)}
-              >
-                <Receipt className="mr-1 h-3.5 w-3.5" /> Ver conta
-              </Button>
-            </div>
-          ) : (
+          {/* actions */}
+          <div className="mt-3 flex gap-2">
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
-              className="w-full"
-              onClick={openBill}
-              disabled={openBillLoading}
+              className="flex-1"
+              onClick={() => setBillOpen(true)}
+              disabled={!table.activeBill}
             >
-              {openBillLoading ? (
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Receipt className="mr-1 h-3.5 w-3.5" />
-              )}
-              Abrir conta
+              <Receipt className="mr-1.5 h-3.5 w-3.5" /> Conta
             </Button>
-          )}
-
-          <div className="flex gap-2">
             <Button asChild variant="outline" size="sm" className="flex-1">
               <a href={table.payUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="mr-1 h-3.5 w-3.5" /> Ver página
-              </a>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <a
-                href={table.qrDataUrl}
-                download={`rohi-qr-${table.label}.png`}
-              >
-                <Download className="mr-1 h-3.5 w-3.5" /> QR
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Página
               </a>
             </Button>
           </div>
-
-          {canManage && (
-            <div className="flex items-center justify-between gap-2">
-              <Select
-                value={table.status}
-                onValueChange={(v) =>
-                  updateStatus(v as TableQrView["status"])
-                }
-                disabled={statusLoading}
-              >
-                <SelectTrigger className="h-8 w-[140px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AVAILABLE">Disponível</SelectItem>
-                  <SelectItem value="OCCUPIED">Ocupada</SelectItem>
-                  <SelectItem value="RESERVED">Reservada</SelectItem>
-                </SelectContent>
-              </Select>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    disabled={deleteLoading}
-                    aria-label="Eliminar mesa"
-                  >
-                    {deleteLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Eliminar mesa?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tem a certeza que pretende eliminar &quot;{table.label}
-                      &quot;? Esta acção não pode ser desfeita.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={deleteTable}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Eliminar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          )}
         </CardContent>
       </Card>
 
       <BillManager
         tableId={table.id}
         tableName={table.label}
-        open={billDialogOpen}
-        onOpenChange={handleBillDialogChange}
+        open={billOpen}
+        onOpenChange={(v) => {
+          setBillOpen(v);
+          if (!v) router.refresh();
+        }}
         canVoid={canManage}
+      />
+
+      <QrDetailDialog
+        table={table}
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        canManage={canManage}
       />
     </>
   );

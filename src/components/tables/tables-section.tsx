@@ -18,13 +18,15 @@ export function TablesSection({
   tables: TableQrView[];
   canManage: boolean;
 }) {
+  const openCount = tables.filter((t) => t.activeBill).length;
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Mesas</h2>
+          <h2 className="text-lg font-semibold">Mesas & QR</h2>
           <p className="text-sm text-muted-foreground">
-            Gestão de mesas, códigos QR e contas
+            {tables.length} mesas · {openCount} com conta aberta
           </p>
         </div>
         {canManage && <AddTableForm />}
