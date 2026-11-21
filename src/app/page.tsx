@@ -82,10 +82,28 @@ export default async function Home() {
         })
       : [];
     const pendingBillIds = new Set(pendingPayments.map((p) => p.billId));
+    // Stage 13D: next upcoming reservation per table (active, from now forward).
+    // One query for all tables, grouped in-memory by tableId.
+    const upcomingReservations = await db.reservation.findMany({
+      where: {
+        restaurantId,
+        status: { in: ["PENDING", "CONFIRMED", "SEATED"] },
+        date: { gte: new Date(Date.now() - 60 * 60_000) },
+      },
+      orderBy: { date: "asc" },
+      select: { tableId: true, customerName: true, partySize: true, date: true, status: true },
+    });
+    const nextReservationByTable = new Map<string, (typeof upcomingReservations)[number]>();
+    for (const r of upcomingReservations) {
+      if (r.tableId && !nextReservationByTable.has(r.tableId)) {
+        nextReservationByTable.set(r.tableId, r);
+      }
+    }
     tables = await Promise.all(
       tableRows.map(async (t) => {
         const payUrl = `${baseUrl}/pay?table=${t.token}`;
         const ab = t.bills[0] ?? null;
+        const nr = nextReservationByTable.get(t.id);
         return {
           id: t.id,
           label: t.label,
@@ -107,6 +125,14 @@ export default async function Home() {
                 totalMinor: ab.totalMinor,
                 currency: ab.currency,
                 hasPendingPayment: pendingBillIds.has(ab.id),
+              }
+            : null,
+          nextReservation: nr
+            ? {
+                customerName: nr.customerName,
+                partySize: nr.partySize,
+                time: nr.date.toISOString(),
+                status: nr.status,
               }
             : null,
         } satisfies TableQrView;

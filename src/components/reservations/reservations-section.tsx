@@ -6,6 +6,8 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Loader2,
   LogIn,
@@ -94,6 +96,8 @@ export function ReservationsSection() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("UPCOMING");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "week">("list");
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   // Assign-table dialog state
   const [assignTarget, setAssignTarget] = useState<ReservationView | null>(null);
@@ -228,40 +232,135 @@ export function ReservationsSection() {
         )}
       </div>
 
-      {/* Search + Filter tabs */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Procurar por nome, telefone ou referência..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-10 pl-9"
-        />
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {[
-          ["UPCOMING", "Próximas"],
-          ["PENDING", "Pendentes"],
-          ["CONFIRMED", "Confirmadas"],
-          ["SEATED", "Sentados"],
-          ["PAST", "Histórico"],
-        ].map(([key, label]) => (
+      {/* Search + view toggle */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Procurar por nome, telefone ou referência..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-10 pl-9"
+          />
+        </div>
+        <div className="flex gap-1 rounded-lg bg-muted p-0.5">
           <button
-            key={key}
             type="button"
-            onClick={() => setFilter(key)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              filter === key
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/70"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+            onClick={() => setViewMode("list")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium ${viewMode === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+          >Lista</button>
+          <button
+            type="button"
+            onClick={() => setViewMode("week")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium ${viewMode === "week" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+          >Semana</button>
+        </div>
       </div>
+      {viewMode === "list" && (
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            ["UPCOMING", "Próximas"],
+            ["PENDING", "Pendentes"],
+            ["CONFIRMED", "Confirmadas"],
+            ["SEATED", "Sentados"],
+            ["PAST", "Histórico"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                filter === key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/70"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {filtered.length === 0 ? (
+      {/* Weekly calendar view (Stage 13C) */}
+      {viewMode === "week" ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="sm" onClick={() => setWeekOffset((w) => w - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              {(() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const start = new Date(today);
+                start.setDate(start.getDate() - start.getDay() + weekOffset * 7);
+                const end = new Date(start);
+                end.setDate(end.getDate() + 6);
+                return `${start.toLocaleDateString("pt-PT", { day: "2-digit", month: "short" })} – ${end.toLocaleDateString("pt-PT", { day: "2-digit", month: "short" })}`;
+              })()}
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setWeekOffset((w) => w + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          {(() => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const weekStart = new Date(today);
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay() + weekOffset * 7);
+            const days = Array.from({ length: 7 }, (_, i) => {
+              const d = new Date(weekStart);
+              d.setDate(d.getDate() + i);
+              return d;
+            });
+            const q = searchQuery.trim().toLowerCase();
+            return (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-7">
+                {days.map((d) => {
+                  const dayEnd = new Date(d);
+                  dayEnd.setHours(23, 59, 59, 999);
+                  const dayRes = reservations.filter((r) => {
+                    const rd = new Date(r.date);
+                    if (rd < d || rd > dayEnd) return false;
+                    if (q && !(r.customerName.toLowerCase().includes(q) || r.phone.toLowerCase().includes(q))) return false;
+                    return true;
+                  });
+                  const isToday = d.toDateString() === new Date().toDateString();
+                  return (
+                    <div key={d.toISOString()} className={`rounded-lg border p-2 ${isToday ? "border-primary/40 bg-primary/5" : "border-border/60"}`}>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-xs font-medium">{d.toLocaleDateString("pt-PT", { weekday: "short" })}</span>
+                        <span className={`text-xs tabular ${isToday ? "font-bold text-primary" : "text-muted-foreground"}`}>{d.getDate()}</span>
+                      </div>
+                      <div className="space-y-1">
+                        {dayRes.length === 0 ? (
+                          <p className="py-2 text-center text-[10px] text-muted-foreground/60">—</p>
+                        ) : dayRes.map((r) => {
+                          const cfg = STATUS_CFG[r.status] ?? STATUS_CFG.PENDING;
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => { setFilter("UPCOMING"); setViewMode("list"); }}
+                              className="block w-full rounded-md border border-border/50 bg-card px-2 py-1 text-left text-[10px] hover:border-primary/40"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{new Date(r.date).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</span>
+                                <span className={cfg.cls + " rounded px-1 text-[9px]"}>{cfg.label}</span>
+                              </div>
+                              <div className="truncate text-muted-foreground">{r.customerName} · {r.partySize}p</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-10">
             <CalendarClock className="h-8 w-8 text-muted-foreground/40" />

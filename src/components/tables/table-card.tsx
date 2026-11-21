@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, QrCode, Receipt, Users } from "lucide-react";
+import { CalendarClock, ExternalLink, QrCode, Receipt, Users } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,13 @@ export interface ActiveBillSummary {
   totalMinor: number;
   currency: string;
   hasPendingPayment: boolean;
+}
+
+export interface NextReservationSummary {
+  customerName: string;
+  partySize: number;
+  time: string; // ISO datetime
+  status: string;
 }
 
 export interface TableQrView {
@@ -35,6 +42,8 @@ export interface TableQrView {
   payUrl: string;
   qrDataUrl: string;
   activeBill: ActiveBillSummary | null;
+  // Stage 13D: next upcoming reservation assigned to this table (today/forward).
+  nextReservation: NextReservationSummary | null;
 }
 
 function cardStatus(t: TableQrView): { label: string; cls: string } {
@@ -121,6 +130,21 @@ export function TableCard({
               <span className="text-[11px] text-muted-foreground">Sem conta</span>
             )}
           </div>
+
+          {/* Next reservation (Stage 13D) */}
+          {table.nextReservation && (
+            <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-[11px]">
+              <div className="flex items-center gap-1.5 font-medium text-primary">
+                <CalendarClock className="h-3 w-3" />
+                {new Date(table.nextReservation.time).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}
+                <span className="text-muted-foreground">· {table.nextReservation.partySize} pax</span>
+              </div>
+              <div className="mt-0.5 truncate text-muted-foreground">
+                {table.nextReservation.customerName}
+                {table.nextReservation.status === "PENDING" && " · pende."}
+              </div>
+            </div>
+          )}
 
           {/* actions */}
           <div className="mt-3 flex gap-2">

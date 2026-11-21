@@ -13,6 +13,7 @@ import {
   Settings,
   Table2,
   Utensils,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ import { SettingsSection } from "@/components/settings/settings-section";
 import { MenuSection } from "@/components/menu/menu-section";
 import { OrdersSection } from "@/components/orders/orders-section";
 import { ReservationsSection } from "@/components/reservations/reservations-section";
+import { OperationsSection } from "@/components/operations/operations-section";
 import { BrandTheme } from "@/components/app/brand-theme";
 import { RestaurantSwitcher } from "@/components/app/restaurant-switcher";
 import type { RestaurantBrand } from "@/lib/brand";
@@ -41,6 +43,7 @@ import type { DashboardStats } from "@/components/dashboard/dashboard-section";
 
 type SectionId =
   | "dashboard"
+  | "operations"
   | "floor-plan"
   | "tables"
   | "billing"
@@ -60,6 +63,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, stage: "2" },
+  { id: "operations", label: "Operations", icon: Workflow, stage: "13" },
   { id: "floor-plan", label: "Floor Plan", icon: Map, stage: "3" },
   { id: "tables", label: "Tables & QR", icon: Table2, stage: "4" },
   { id: "billing", label: "Billing", icon: Receipt, stage: "5" },
@@ -73,6 +77,7 @@ const NAV: NavItem[] = [
 
 const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Revenue, payments and table activity" },
+  operations: { title: "Operations", subtitle: "Live service overview" },
   "floor-plan": { title: "Floor Plan", subtitle: "Interactive restaurant layout" },
   tables: { title: "Tables & QR", subtitle: "Manage tables and QR codes" },
   billing: { title: "Billing", subtitle: "Open bills and lightweight POS" },
@@ -274,6 +279,7 @@ export function DashboardShell({
             {active === "dashboard" && (
               <DashboardSection stats={stats} tables={tables} />
             )}
+            {active === "operations" && <OperationsSection />}
             {active === "tables" && (
               <TablesSection tables={tables} canManage={canManage} />
             )}
