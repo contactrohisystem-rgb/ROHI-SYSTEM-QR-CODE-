@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Utensils } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, Utensils } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export function MenuSection() {
   const [prodDesc, setProdDesc] = useState("");
   const [prodPrice, setProdPrice] = useState("");
   const [prodSaving, setProdSaving] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductView | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -103,6 +104,35 @@ export function MenuSection() {
         setProdName(""); setProdDesc(""); setProdPrice(""); setProdOpen(false); await load();
       } else { toast({ title: "Erro", variant: "destructive" }); }
     } finally { setProdSaving(false); }
+  }
+
+  function openEditProduct(p: ProductView) {
+    setEditingProduct(p);
+    setProdName(p.name);
+    setProdDesc(p.description ?? "");
+    setProdPrice(String(p.priceMinor / 100));
+    setProdCatId(null);
+    setProdOpen(true);
+  }
+
+  async function saveProduct() {
+    if (editingProduct) {
+      // Edit existing
+      setProdSaving(true);
+      try {
+        const res = await fetch(`/api/menu/products/${editingProduct.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: prodName, description: prodDesc || null, price: prodPrice }),
+        });
+        if (res.ok) {
+          toast({ title: "Produto actualizado" });
+          setProdOpen(false); setEditingProduct(null); await load();
+        } else { toast({ title: "Erro", variant: "destructive" }); }
+      } finally { setProdSaving(false); }
+    } else {
+      addProduct();
+    }
   }
 
   async function deleteCategory(id: string) {
@@ -185,6 +215,9 @@ export function MenuSection() {
                         <Badge variant={p.available ? "secondary" : "outline"} className="cursor-pointer text-[10px]" onClick={() => toggleAvailable(p)}>
                           {p.available ? "Disponível" : "Indisp."}
                         </Badge>
+                        <Button size="ghost" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => openEditProduct(p)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
                         <Button size="ghost" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => deleteProduct(p.id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -214,15 +247,15 @@ export function MenuSection() {
 
       <Dialog open={prodOpen} onOpenChange={setProdOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Novo produto</DialogTitle><DialogDescription>Adicione um produto.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingProduct ? "Editar produto" : "Novo produto"}</DialogTitle><DialogDescription>{editingProduct ? "Altere as propriedades do produto." : "Adicione um produto."}</DialogDescription></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-2"><Label htmlFor="prod-name">Nome</Label><Input id="prod-name" placeholder="Cerveja 2M" value={prodName} onChange={(e) => setProdName(e.target.value)} /></div>
             <div className="space-y-2"><Label htmlFor="prod-desc">Descrição</Label><Input id="prod-desc" placeholder="Cerveja local gelada" value={prodDesc} onChange={(e) => setProdDesc(e.target.value)} /></div>
             <div className="space-y-2"><Label htmlFor="prod-price">Preço (MZN)</Label><Input id="prod-price" placeholder="75" inputMode="decimal" value={prodPrice} onChange={(e) => setProdPrice(e.target.value)} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProdOpen(false)}>Cancelar</Button>
-            <Button onClick={addProduct} disabled={prodSaving || !prodName || !prodPrice}>{prodSaving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Criar</Button>
+            <Button variant="outline" onClick={() => { setProdOpen(false); setEditingProduct(null); }}>Cancelar</Button>
+            <Button onClick={saveProduct} disabled={prodSaving || !prodName || !prodPrice}>{prodSaving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}{editingProduct ? "Guardar" : "Criar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

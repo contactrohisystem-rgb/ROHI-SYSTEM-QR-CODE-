@@ -40,6 +40,8 @@ export interface DashboardStats {
   failedCount: number;
   activeTables: number;
   openBills: number;
+  pendingOrders: number;
+  activeOrders: number;
   revenueSeries: { day: string; revenueMinor: number }[];
   methodBreakdown: {
     method: string;
@@ -164,6 +166,20 @@ export function DashboardSection({
           icon={Receipt}
           tone="neutral"
           hint="Aguardam pagamento"
+        />
+        <KpiCard
+          label="Pedidos pendentes"
+          value={String(stats.pendingOrders)}
+          icon={Clock}
+          tone="amber"
+          hint="Aguardam aceitação"
+        />
+        <KpiCard
+          label="Pedidos activos"
+          value={String(stats.activeOrders)}
+          icon={Receipt}
+          tone="teal"
+          hint="Em preparação / prontos"
         />
         <KpiCard
           label="Transacções"

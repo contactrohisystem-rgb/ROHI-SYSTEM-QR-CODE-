@@ -43,6 +43,8 @@ export default async function Home() {
     failedCount: 0,
     activeTables: 0,
     openBills: 0,
+    pendingOrders: 0,
+    activeOrders: 0,
     revenueSeries: [],
     methodBreakdown: [],
     recentTransactions: [],
@@ -202,6 +204,14 @@ export default async function Home() {
       where: { restaurantId, status: "OPEN" },
     });
 
+    // Order counts for the dashboard KPIs.
+    const pendingOrders = await db.customerOrder.count({
+      where: { restaurantId, status: { in: ["SUBMITTED", "RECEIVED"] } },
+    });
+    const activeOrders = await db.customerOrder.count({
+      where: { restaurantId, status: { in: ["ACCEPTED", "PREPARING", "READY"] } },
+    });
+
     stats = {
       currency,
       totalRevenueMinor,
@@ -212,6 +222,8 @@ export default async function Home() {
       failedCount: failed.length,
       activeTables: tables.filter((t) => !!t.activeBill).length,
       openBills,
+      pendingOrders,
+      activeOrders,
       revenueSeries,
       methodBreakdown,
       recentTransactions,
