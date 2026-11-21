@@ -53,6 +53,12 @@ const submitSchema = z.object({
     }),
   ).min(1),
   notes: z.string().max(500).optional(),
+  // COD / delivery fields (only for DELIVERY orders).
+  orderType: z.enum(["DINE_IN", "DELIVERY"]).optional(),
+  customerName: z.string().max(80).optional(),
+  customerPhone: z.string().max(30).optional(),
+  deliveryAddress: z.string().max(300).optional(),
+  deliveryInstructions: z.string().max(500).optional(),
 });
 
 /**
@@ -73,6 +79,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
 
   const { tableToken, tableId, restaurantSlug, items, notes } = parsed.data;
+  const orderType = parsed.data.orderType ?? "DINE_IN";
+
+  // For DELIVERY (COD) orders, require delivery details.
+  if (orderType === "DELIVERY") {
+    if (!parsed.data.customerName || !parsed.data.customerPhone || !parsed.data.deliveryAddress) {
+      return NextResponse.json({ error: "missing_delivery_details" }, { status: 400 });
+    }
+  }
 
   let restaurantId: string;
   let resolvedTableId: string | null;
@@ -137,6 +151,12 @@ export async function POST(req: Request) {
         tableId: resolvedTableId,
         status: initialStatus,
         notes: notes ?? null,
+        orderType,
+        customerName: orderType === "DELIVERY" ? parsed.data.customerName ?? null : null,
+        customerPhone: orderType === "DELIVERY" ? parsed.data.customerPhone ?? null : null,
+        deliveryAddress: orderType === "DELIVERY" ? parsed.data.deliveryAddress ?? null : null,
+        deliveryInstructions: orderType === "DELIVERY" ? parsed.data.deliveryInstructions ?? null : null,
+        deliveryFeeMinor: 0, // set by billing when the bill is opened
       },
     });
     for (const item of items) {

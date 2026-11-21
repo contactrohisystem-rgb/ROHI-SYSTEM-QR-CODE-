@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  Banknote,
   CalendarClock,
   CreditCard,
   LayoutDashboard,
@@ -30,6 +31,7 @@ import { MenuSection } from "@/components/menu/menu-section";
 import { OrdersSection } from "@/components/orders/orders-section";
 import { ReservationsSection } from "@/components/reservations/reservations-section";
 import { OperationsSection } from "@/components/operations/operations-section";
+import { CashManagementSection } from "@/components/payments/cash-management-section";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { RestaurantBrand } from "@/lib/brand";
 import type { MembershipView } from "@/types/next-auth";
@@ -50,6 +52,7 @@ type SectionId =
   | "orders"
   | "reservations"
   | "payments"
+  | "cash"
   | "pos"
   | "settings";
 
@@ -70,6 +73,7 @@ const NAV: NavItem[] = [
   { id: "orders", label: "Orders", icon: Package, stage: "12" },
   { id: "reservations", label: "Reservations", icon: CalendarClock, stage: "12" },
   { id: "payments", label: "Payments", icon: CreditCard, stage: "6" },
+  { id: "cash", label: "Cash", icon: Banknote, stage: "14" },
   { id: "pos", label: "POS Sync", icon: Plug, stage: "8" },
   { id: "settings", label: "Settings", icon: Settings, stage: "10" },
 ];
@@ -84,6 +88,7 @@ const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string }> = {
   orders: { title: "Orders", subtitle: "QR + staff-created orders" },
   reservations: { title: "Reservations", subtitle: "Manage table reservations" },
   payments: { title: "Payments", subtitle: "Transaction history and status" },
+  cash: { title: "Cash Management", subtitle: "Pending cash collections and change calculation" },
   pos: { title: "POS Synchronisation", subtitle: "POS connection and sync records" },
   settings: { title: "Settings", subtitle: "Restaurant, staff and configuration" },
 };
@@ -323,6 +328,7 @@ export function DashboardShell({
             {active === "payments" && (
               <PaymentsSection transactions={transactions} />
             )}
+            {active === "cash" && <CashManagementSection />}
             {active === "settings" && <SettingsSection />}
           </div>
         </main>

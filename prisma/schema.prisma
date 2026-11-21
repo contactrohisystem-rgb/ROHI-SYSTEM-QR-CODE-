@@ -76,6 +76,7 @@ enum PaymentProviderCode {
   MPESA
   EMOLA
   CARD
+  CASH
   MOCK
 }
 
@@ -126,6 +127,7 @@ model User {
   accounts    Account[]
   sessions    Session[]
   auditLogs   AuditLog[] @relation("AuditActorUser")
+  cashCollections CashCollection[] @relation("CashCollector")
 
   @@index([email])
 }
@@ -191,6 +193,20 @@ model Restaurant {
   reservationApprovalMode     String @default("STAFF") // STAFF | AUTO
   reservationCancellationPolicy String?
 
+  // Payment methods — per-restaurant enable/disable. A method appears in the
+  // checkout only when enabled here AND (for digital providers) its adapter is
+  // configured with credentials. CASH is always available when cashEnabled.
+  cashEnabled       Boolean @default(true)
+  codEnabled        Boolean @default(false) // cash on delivery (remote orders)
+  cardEnabled       Boolean @default(false)
+  mpesaEnabled      Boolean @default(true)
+  emolaEnabled      Boolean @default(false)
+  // COD / delivery configuration.
+  deliveryFeeMinor     Int @default(0)
+  minCodOrderMinor     Int @default(0)  // minimum order value for COD
+  maxCodOrderMinor     Int @default(0)  // 0 = no maximum
+  deliveryZones        String? // JSON array of zone names/radii
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -206,6 +222,7 @@ model Restaurant {
   staff        RestaurantStaff[]
   posConnection PosConnection?
   auditLogs    AuditLog[]
+  cashCollections CashCollection[]
 
   @@index([status])
 }
@@ -385,8 +402,16 @@ model CustomerOrder {
   // orders still bind to a table. Optional relation preserves orders when a
   // table is deleted (SetNull) rather than cascading the deletion.
   tableId      String?
-  status       String   @default("SUBMITTED") // SUBMITTED | RECEIVED | ACCEPTED | PREPARING | READY | SERVED | CANCELLED | REJECTED
+  status       String   @default("SUBMITTED") // SUBMITTED | RECEIVED | ACCEPTED | PREPARING | READY | SERVED | DISPATCHED | DELIVERED | CANCELLED | REJECTED
   notes        String?
+  // Order type: DINE_IN (table QR or in-restaurant) or DELIVERY (remote COD).
+  orderType    String   @default("DINE_IN")
+  // Delivery details (populated for COD / DELIVERY orders only).
+  customerName    String?
+  customerPhone   String?
+  deliveryAddress String?
+  deliveryInstructions String?
+  deliveryFeeMinor Int     @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -396,6 +421,7 @@ model CustomerOrder {
 
   @@index([restaurantId, status])
   @@index([tableId, status])
+  @@index([restaurantId, orderType])
 }
 
 model CustomerOrderItem {
@@ -564,11 +590,40 @@ model Payment {
   bill       Bill           @relation(fields: [billId], references: [id], onDelete: Restrict)
   restaurant Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   events     PaymentEvent[]
+  cashCollection CashCollection?
 
   @@index([billId, status])
   @@index([restaurantId, status])
   @@index([providerCode, status])
   @@index([providerPaymentId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Cash Collection — staff-confirmed cash payment records (dine-in + COD)
+// ────────────────────────────────────────────────────────────────────────────
+
+model CashCollection {
+  id              String   @id @default(cuid())
+  paymentId       String   @unique // one collection per payment
+  restaurantId    String   // tenant key
+  // DINE_IN: customer pays cash at the table. CASH_ON_DELIVERY: courier collects.
+  collectionType  String   // DINE_IN | CASH_ON_DELIVERY
+  staffUserId     String?  // the authorised staff member who confirmed (nullable if user deleted)
+  amountDueMinor  Int      // the amount the customer owed
+  amountReceivedMinor Int  // the cash the staff received
+  changeMinor     Int      // amountReceived - amountDue (server-calculated)
+  currency        String
+  confirmedAt     DateTime @default(now())
+  auditReference  String?  // optional manual reference / cash register ID
+  createdAt       DateTime @default(now())
+
+  payment    Payment    @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  staffUser  User?       @relation("CashCollector", fields: [staffUserId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, confirmedAt])
+  @@index([restaurantId, collectionType])
+  @@index([staffUserId])
 }
 
 // Append-only payment state log: every transition + every webhook received.

@@ -64,14 +64,14 @@ export function CheckoutPanel({
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [methods, setMethods] = useState<{
-    code: string; label: string; description: string; isDemo: boolean; requiresPhone: boolean;
+    code: string; label: string; description: string; isDemo: boolean; requiresPhone: boolean; isCash: boolean;
   }[]>([]);
   const [selectedMethod, setSelectedMethod] = useState<string>("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch available payment methods (only configured/operational ones appear).
+  // Fetch available payment methods (restaurant-scoped via tableToken).
   useEffect(() => {
-    fetch("/api/payments/methods")
+    fetch(`/api/payments/methods?tableToken=${encodeURIComponent(tableToken)}`)
       .then((r) => r.json())
       .then((d) => {
         const ms = d.methods ?? [];
@@ -236,6 +236,23 @@ export function CheckoutPanel({
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               {t("methodsNote")}
             </p>
+            {/* Cash method: show "pay cash to server" message */}
+            {(() => {
+              const sel = methods.find((m) => m.code === selectedMethod);
+              if (!sel?.isCash) return null;
+              return (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-center">
+                  <p className="text-sm font-medium text-foreground">
+                    {locale === "pt" ? "Pague em dinheiro ao empregado" : "Pay cash to the server"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {locale === "pt"
+                      ? "O empregado confirmará a receção e calculará o troco."
+                      : "The server will confirm collection and calculate change."}
+                  </p>
+                </div>
+              );
+            })()}
             {/* Phone field — only for mobile-money methods */}
             {(() => {
               const sel = methods.find((m) => m.code === selectedMethod);
@@ -285,11 +302,32 @@ export function CheckoutPanel({
         {view === "awaiting" && (
           <div className="space-y-4">
             <div className="flex flex-col items-center gap-2 py-2 text-center">
-              <Loader2 className="h-7 w-7 animate-spin text-primary" />
-              <p className="text-sm font-medium">{t("awaiting")}</p>
-              <p className="max-w-xs text-[11px] leading-relaxed text-muted-foreground">
-                {t("awaitingNote")}
-              </p>
+              {(() => {
+                const sel = methods.find((m) => m.code === selectedMethod);
+                if (sel?.isCash) {
+                  return (
+                    <>
+                      <p className="text-sm font-medium">
+                        {locale === "pt" ? "Aguarda cobrança pelo empregado" : "Awaiting collection by staff"}
+                      </p>
+                      <p className="max-w-xs text-[11px] leading-relaxed text-muted-foreground">
+                        {locale === "pt"
+                          ? "Pague em dinheiro ao empregado. O pagamento será confirmado quando o empregado registar a receção."
+                          : "Pay cash to the server. Payment will be confirmed when the server records collection."}
+                      </p>
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <Loader2 className="h-7 w-7 animate-spin text-primary" />
+                    <p className="text-sm font-medium">{t("awaiting")}</p>
+                    <p className="max-w-xs text-[11px] leading-relaxed text-muted-foreground">
+                      {t("awaitingNote")}
+                    </p>
+                  </>
+                );
+              })()}
             </div>
             {/* The simulate-approval button is ONLY shown for the MOCK demo
                 provider. Real providers (M-Pesa, e-Mola, card) confirm via

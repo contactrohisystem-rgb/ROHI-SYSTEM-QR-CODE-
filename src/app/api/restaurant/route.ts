@@ -25,6 +25,16 @@ const patchSchema = z.object({
   maxPartySize: z.number().int().min(1).max(50).optional(),
   reservationApprovalMode: z.enum(["STAFF", "AUTO"]).optional(),
   reservationCancellationPolicy: z.string().max(500).nullable().optional(),
+  // Payment method config (per-restaurant enable/disable).
+  cashEnabled: z.boolean().optional(),
+  codEnabled: z.boolean().optional(),
+  cardEnabled: z.boolean().optional(),
+  mpesaEnabled: z.boolean().optional(),
+  emolaEnabled: z.boolean().optional(),
+  deliveryFeeMinor: z.number().int().min(0).optional(),
+  minCodOrderMinor: z.number().int().min(0).optional(),
+  maxCodOrderMinor: z.number().int().min(0).optional(),
+  deliveryZones: z.string().max(2000).nullable().optional(),
 });
 
 // GET /api/restaurant — the active restaurant's profile + branding + reservation
@@ -58,6 +68,15 @@ export async function GET() {
       maxPartySize: true,
       reservationApprovalMode: true,
       reservationCancellationPolicy: true,
+      cashEnabled: true,
+      codEnabled: true,
+      cardEnabled: true,
+      mpesaEnabled: true,
+      emolaEnabled: true,
+      deliveryFeeMinor: true,
+      minCodOrderMinor: true,
+      maxCodOrderMinor: true,
+      deliveryZones: true,
     },
   });
   if (!restaurant) {
