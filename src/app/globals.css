@@ -167,6 +167,39 @@
   }
 }
 
+/* =========================================================================
+   THEME-LIGHT TEXT VISIBILITY (MARÉA guest experience)
+   The default dark admin theme sets --foreground to a near-white OKLCH value.
+   On ivory/white guest backgrounds this rendered invisible/washed-out text.
+   This override sets reliable hex colours on the theme-light context so all
+   INHERITED text is dark and readable. Elements with explicit colour classes
+   (text-white, text-primary, inline styles) are NOT affected — only elements
+   that inherit their colour from the container get the dark fallback.
+   ========================================================================= */
+.theme-light {
+  color: #242522;
+  --foreground: #242522;
+  --muted-foreground: #5a6258;
+  --card-foreground: #242522;
+  --popover-foreground: #242522;
+  --input: #d8d2c8;
+  --border: #d8d2c8;
+}
+.theme-light input,
+.theme-light textarea,
+.theme-light select,
+.theme-light [data-slot="input"] {
+  color: #242522;
+}
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #8a8f8a;
+}
+.theme-light [data-slot="label"],
+.theme-light label {
+  color: #242522;
+}
+
 /* subtle entrance animation for cards/sections */
 @keyframes rohi-fade-up {
   from {
