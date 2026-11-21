@@ -178,6 +178,8 @@ model Restaurant {
   menuCategories MenuCategory[]
   products     Product[]
   customerOrders CustomerOrder[]
+  reservations  Reservation[]
+  kitchenStations KitchenStation[]
   bills        Bill[]
   payments     Payment[]
   staff        RestaurantStaff[]
@@ -264,6 +266,7 @@ model RestaurantTable {
   floorArea  Area?       @relation("AreaTables", fields: [areaId], references: [id], onDelete: SetNull)
   bills      Bill[]     @relation("TableBills")
   customerOrders CustomerOrder[]
+  reservations  Reservation[]
 
   // Active bill is resolved by query (Bill where tableId + status in
   // [OPEN, PENDING_PAYMENT]) rather than a stored pointer, to avoid sync bugs.
@@ -329,12 +332,14 @@ model Product {
   priceMinor   Int       // integer minor units (centavos)
   imageUrl     String?
   available    Boolean   @default(true)
+  kitchenStationId String? // FK to KitchenStation (nullable = default queue)
   sortOrder    Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   restaurant Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  kitchenStation KitchenStation? @relation(fields: [kitchenStationId], references: [id], onDelete: SetNull)
 
   @@index([restaurantId, categoryId])
   @@index([restaurantId, available])
@@ -369,11 +374,57 @@ model CustomerOrderItem {
   quantity        Int      @default(1)
   unitPriceMinor  Int      // snapshot of price at order time
   notes           String?
+  // Kitchen preparation status (item-level): NEW → PREPARING → READY → COMPLETED
+  prepStatus      String   @default("NEW")
   createdAt       DateTime @default(now())
 
   order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Kitchen Display System (KDS) — stations + ticket routing
+// ────────────────────────────────────────────────────────────────────────────
+
+model KitchenStation {
+  id           String   @id @default(cuid())
+  restaurantId String
+  name         String   // "Grill", "Drinks", "Desserts", "Main Kitchen"
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  products   Product[]
+
+  @@index([restaurantId, sortOrder])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Table Reservations (customer-initiated, staff-managed)
+// ────────────────────────────────────────────────────────────────────────────
+
+model Reservation {
+  id           String   @id @default(cuid())
+  restaurantId String
+  tableId      String?  // assigned by staff (nullable until confirmed)
+  customerName String
+  phone        String
+  partySize    Int      @default(2)
+  date         DateTime // reservation date + time
+  durationMins Int      @default(90)
+  areaPreference String? // "Indoor", "Terrace", etc.
+  notes        String?
+  status       String   @default("PENDING") // PENDING | CONFIRMED | SEATED | COMPLETED | CANCELLED | NO_SHOW
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table      RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, date])
+  @@index([restaurantId, status])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
