@@ -30,7 +30,7 @@ export async function GET(req: Request) {
         products: {
           where: { available: true },
           orderBy: { sortOrder: "asc" },
-          select: { id: true, name: true, description: true, priceMinor: true, imageUrl: true },
+          select: { id: true, name: true, nameEn: true, description: true, descriptionEn: true, priceMinor: true, imageUrl: true, featured: true },
         },
       },
     });

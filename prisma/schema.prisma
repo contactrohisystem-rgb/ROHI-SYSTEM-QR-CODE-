@@ -350,9 +350,15 @@ model Product {
   categoryId   String
   name         String
   description  String?
+  // MARÉA prototype: bilingual menu (Portuguese primary, English secondary).
+  // Nullable + additive — existing restaurants are unaffected.
+  nameEn         String?
+  descriptionEn  String?
   priceMinor   Int       // integer minor units (centavos)
   imageUrl     String?
   available    Boolean   @default(true)
+  // MARÉA: signature/featured dish flag for menu highlights.
+  featured    Boolean   @default(false)
   kitchenStationId String? // FK to KitchenStation (nullable = default queue)
   sortOrder    Int       @default(0)
   createdAt    DateTime  @default(now())
@@ -364,6 +370,7 @@ model Product {
 
   @@index([restaurantId, categoryId])
   @@index([restaurantId, available])
+  @@index([restaurantId, featured])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -373,14 +380,18 @@ model Product {
 model CustomerOrder {
   id           String   @id @default(cuid())
   restaurantId String
-  tableId      String
+  // MARÉA: tableId is nullable to support landing-page preorders (guests
+  // browsing the public menu without a physical table). In-restaurant QR
+  // orders still bind to a table. Optional relation preserves orders when a
+  // table is deleted (SetNull) rather than cascading the deletion.
+  tableId      String?
   status       String   @default("SUBMITTED") // SUBMITTED | RECEIVED | ACCEPTED | PREPARING | READY | SERVED | CANCELLED | REJECTED
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table      RestaurantTable  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  table      RestaurantTable?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
   items      CustomerOrderItem[]
 
   @@index([restaurantId, status])

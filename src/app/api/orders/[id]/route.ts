@@ -34,9 +34,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const newStatus = parsed.data.status;
 
-  // If accepting → add items to the bill
-  if (newStatus === "ACCEPTED" && order.status !== "ACCEPTED") {
-    // Find or create the table's active bill
+  // If accepting → add items to the bill (only when the order is bound to a
+  // table; landing-page preorders with tableId=null are accepted without a
+  // bill until the guest is seated at a table).
+  if (newStatus === "ACCEPTED" && order.status !== "ACCEPTED" && order.tableId) {
     let bill = await db.bill.findFirst({
       where: { tableId: order.tableId, status: "OPEN" },
       orderBy: { openedAt: "desc" },

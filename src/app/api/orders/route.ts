@@ -44,6 +44,7 @@ export async function GET(req: Request) {
 const submitSchema = z.object({
   tableToken: z.string().min(1).optional(),
   tableId: z.string().min(1).optional(),
+  restaurantSlug: z.string().min(1).optional(),
   items: z.array(
     z.object({
       productId: z.string(),
@@ -56,8 +57,11 @@ const submitSchema = z.object({
 
 /**
  * POST /api/orders — submit an order.
- * Two modes:
- *   Guest: { tableToken, items } — token-gated, no auth. Creates SUBMITTED.
+ * Three modes:
+ *   Guest (table): { tableToken, items } — token-gated, no auth. Creates SUBMITTED.
+ *   Guest (preorder): { restaurantSlug, items } — public landing-page preorder,
+ *     no table. Creates SUBMITTED with tableId=null. The order appears in staff
+ *     operations as a preorder (no table label).
  *   Staff: { tableId, items } — SERVER+, resolves the table from the caller's
  *          restaurant. Creates ACCEPTED (staff already confirmed with the
  *          customer) so the ticket goes straight to the KDS.
@@ -68,14 +72,14 @@ export async function POST(req: Request) {
   if (!parsed.success)
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
 
-  const { tableToken, tableId, items, notes } = parsed.data;
+  const { tableToken, tableId, restaurantSlug, items, notes } = parsed.data;
 
   let restaurantId: string;
-  let resolvedTableId: string;
+  let resolvedTableId: string | null;
   let initialStatus: string;
 
   if (tableToken) {
-    // Guest mode
+    // Guest mode (table QR)
     const table = await db.restaurantTable.findUnique({
       where: { token: tableToken },
       include: { restaurant: { select: { id: true, status: true } } },
@@ -84,6 +88,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_table" }, { status: 404 });
     restaurantId = table.restaurant.id;
     resolvedTableId = table.id;
+    initialStatus = "SUBMITTED";
+  } else if (restaurantSlug) {
+    // Guest mode (public landing-page preorder — no table)
+    const restaurant = await db.restaurant.findFirst({
+      where: { slug: restaurantSlug, status: "active" },
+      select: { id: true },
+    });
+    if (!restaurant)
+      return NextResponse.json({ error: "invalid_restaurant" }, { status: 404 });
+    restaurantId = restaurant.id;
+    resolvedTableId = null;
     initialStatus = "SUBMITTED";
   } else if (tableId) {
     // Staff mode

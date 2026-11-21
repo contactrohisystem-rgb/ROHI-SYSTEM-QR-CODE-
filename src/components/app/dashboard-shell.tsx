@@ -17,8 +17,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { Brand } from "@/components/app/brand";
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { BrandTheme } from "@/components/app/brand-theme";
+import { RestaurantSwitcher } from "@/components/app/restaurant-switcher";
 import { TablesSection } from "@/components/tables/tables-section";
 import { PosSection } from "@/components/pos/pos-section";
 import { DashboardSection } from "@/components/dashboard/dashboard-section";
@@ -30,8 +30,7 @@ import { MenuSection } from "@/components/menu/menu-section";
 import { OrdersSection } from "@/components/orders/orders-section";
 import { ReservationsSection } from "@/components/reservations/reservations-section";
 import { OperationsSection } from "@/components/operations/operations-section";
-import { BrandTheme } from "@/components/app/brand-theme";
-import { RestaurantSwitcher } from "@/components/app/restaurant-switcher";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { RestaurantBrand } from "@/lib/brand";
 import type { MembershipView } from "@/types/next-auth";
 import { Button } from "@/components/ui/button";
@@ -88,6 +87,26 @@ const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string }> = {
   pos: { title: "POS Synchronisation", subtitle: "POS connection and sync records" },
   settings: { title: "Settings", subtitle: "Restaurant, staff and configuration" },
 };
+
+/**
+ * Restaurant wordmark for the sidebar header. Shows the active restaurant's
+ * name in an elegant serif (MARÉA prototype) instead of generic ROHI branding.
+ */
+function RestaurantWordmark({ name }: { name?: string | null }) {
+  return (
+    <div className="leading-none">
+      <div
+        className="text-base font-semibold tracking-tight text-sidebar-foreground"
+        style={{ fontFamily: "var(--font-playfair), Georgia, serif" }}
+      >
+        {name ?? "ROHI"}
+      </div>
+      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        Restaurant Operations
+      </div>
+    </div>
+  );
+}
 
 function PlaceholderSection({ label, stage }: { label: string; stage: string }) {
   return (
@@ -195,7 +214,7 @@ export function DashboardShell({
             />
           ) : null}
           <div className={brand?.logoUrl ? "ml-2.5" : ""}>
-            <Brand />
+            <RestaurantWordmark name={user.activeRestaurantName} />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto py-4">
@@ -224,7 +243,7 @@ export function DashboardShell({
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-64 border-sidebar-border bg-sidebar p-0">
           <div className="flex h-16 items-center px-5">
-            <Brand />
+            <RestaurantWordmark name={user.activeRestaurantName} />
           </div>
           <div className="py-4">
             <SidebarBody active={active} onSelect={select} />
