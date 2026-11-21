@@ -18,6 +18,7 @@
     "chooseMethod": "Choose a payment method",
     "mpesaDemo": "M-Pesa",
     "mpesaDemoNote": "Demonstration mode — no real credentials.",
+    "methodsNote": "M-Pesa, e-Mola and card appear when real integrations are configured and verified.",
     "demo": "Demo",
     "phone": "M-Pesa number",
     "phoneHint": "Enter the number linked to your M-Pesa account (9 digits).",

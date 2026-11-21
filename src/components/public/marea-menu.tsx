@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  ArrowLeft,
   Check,
   Loader2,
   Minus,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -45,17 +45,21 @@ interface BasketItem {
   productId: string;
   name: string;
   priceMinor: number;
+  imageUrl: string | null;
   quantity: number;
 }
 
 const SERIF = "var(--font-playfair), Georgia, 'Times New Roman', serif";
 
 /**
- * MARÉA digital menu (Stage: MARÉA prototype).
+ * MARÉA digital menu with live quantity selection + premium order review.
  *
- * Premium mobile-first menu with category navigation, food photography,
- * bilingual dish names (PT primary / EN secondary), prices in MT, featured
- * indicators, search, and a basket that submits a preorder to the kitchen.
+ * Every product card shows an immediate `− N +` selector once selected, so the
+ * guest always sees the current quantity without opening the basket. The
+ * basket bar (sticky) and the order-review dialog stay synchronised with the
+ * same source of truth. A dedicated review screen shows line items, line
+ * totals, subtotal, special instructions, and a clear confirm action before
+ * submission — order submission and payment remain separate processes.
  */
 export function MareaMenu({
   slug,
@@ -75,6 +79,7 @@ export function MareaMenu({
   const [basketOpen, setBasketOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [orderRef, setOrderRef] = useState<string | null>(null);
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     fetch(`/api/restaurants/${encodeURIComponent(slug)}/menu`)
@@ -87,7 +92,7 @@ export function MareaMenu({
       .finally(() => setLoading(false));
   }, [slug]);
 
-  // Persist basket in localStorage (survives tab switches)
+  // Persist basket in localStorage (survives page refresh / category changes).
   useEffect(() => {
     const saved = localStorage.getItem(`marea_basket_${slug}`);
     if (saved) setBasket(JSON.parse(saved));
@@ -96,25 +101,33 @@ export function MareaMenu({
     localStorage.setItem(`marea_basket_${slug}`, JSON.stringify(basket));
   }, [basket, slug]);
 
-  function addToBasket(p: MenuProduct) {
+  // Single source of truth for basket mutations.
+  function inc(productId: string) {
     setBasket((prev) => {
-      const ex = prev.find((i) => i.productId === p.id);
-      if (ex) return prev.map((i) => (i.productId === p.id ? { ...i, quantity: i.quantity + 1 } : i));
-      return [...prev, { productId: p.id, name: p.name, priceMinor: p.priceMinor, quantity: 1 }];
+      const ex = prev.find((i) => i.productId === productId);
+      if (ex) return prev.map((i) => (i.productId === productId ? { ...i, quantity: i.quantity + 1 } : i));
+      // Need product details — find in categories
+      const p = categories.flatMap((c) => c.products).find((pr) => pr.id === productId);
+      if (!p) return prev;
+      return [...prev, { productId: p.id, name: p.name, priceMinor: p.priceMinor, imageUrl: p.imageUrl, quantity: 1 }];
     });
   }
-  function changeQty(productId: string, delta: number) {
+  function dec(productId: string) {
     setBasket((prev) =>
       prev
-        .map((i) => (i.productId === productId ? { ...i, quantity: i.quantity + delta } : i))
+        .map((i) => (i.productId === productId ? { ...i, quantity: i.quantity - 1 } : i))
         .filter((i) => i.quantity > 0),
     );
+  }
+  function qtyOf(productId: string): number {
+    return basket.find((i) => i.productId === productId)?.quantity ?? 0;
   }
 
   const basketCount = basket.reduce((s, i) => s + i.quantity, 0);
   const basketTotal = basket.reduce((s, i) => s + i.quantity * i.priceMinor, 0);
 
   async function submitOrder() {
+    if (submitting || basket.length === 0) return; // guard against double-submit
     setSubmitting(true);
     try {
       const res = await fetch("/api/orders", {
@@ -123,18 +136,23 @@ export function MareaMenu({
         body: JSON.stringify({
           restaurantSlug: slug,
           items: basket.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          notes: notes || undefined,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         setOrderRef(data.order?.id?.slice(0, 12).toUpperCase() ?? "—");
         setBasket([]);
+        setNotes("");
         localStorage.removeItem(`marea_basket_${slug}`);
+        setBasketOpen(false);
         toast({ title: locale === "pt" ? "Pré-encomenda enviada!" : "Pre-order submitted!" });
       } else {
         const d = await res.json().catch(() => ({}));
         toast({ title: d.error ?? "Erro", variant: "destructive" });
       }
+    } catch {
+      toast({ title: locale === "pt" ? "Erro de ligação" : "Network error", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -211,9 +229,7 @@ export function MareaMenu({
             type="button"
             onClick={() => { setActiveCat(c.id); setQuery(""); }}
             className={`rounded-full px-4 py-2 text-sm font-medium tracking-wide transition-all ${
-              active?.id === c.id
-                ? "text-white shadow-sm"
-                : "text-[#173C32]/70 hover:text-[#173C32]"
+              active?.id === c.id ? "text-white shadow-sm" : "text-[#173C32]/70 hover:text-[#173C32]"
             }`}
             style={active?.id === c.id ? { background: "#173C32" } : { background: "rgba(23,60,50,0.06)" }}
           >
@@ -225,7 +241,15 @@ export function MareaMenu({
       {/* Dish grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((p) => (
-          <DishCard key={p.id} product={p} currency={currency} locale={locale} onAdd={() => addToBasket(p)} />
+          <DishCard
+            key={p.id}
+            product={p}
+            currency={currency}
+            locale={locale}
+            qty={qtyOf(p.id)}
+            onInc={() => inc(p.id)}
+            onDec={() => dec(p.id)}
+          />
         ))}
       </div>
       {filtered.length === 0 && (
@@ -234,9 +258,9 @@ export function MareaMenu({
         </p>
       )}
 
-      {/* Basket bar (sticky) */}
+      {/* Sticky basket bar */}
       {basketCount > 0 && (
-        <div className="sticky bottom-4 z-20 mx-auto max-w-md">
+        <div className="sticky bottom-4 z-20 mx-auto max-w-md px-4" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           <button
             type="button"
             onClick={() => setBasketOpen(true)}
@@ -247,58 +271,107 @@ export function MareaMenu({
               <ShoppingCart className="h-4 w-4" />
               {basketCount} {locale === "pt" ? "itens" : "items"}
             </span>
-            <span className="text-sm font-semibold tabular" style={{ color: "#C6A66B" }}>
-              {formatMoney(basketTotal, currency, locale)}
+            <span className="flex items-center gap-1 text-sm font-semibold tabular">
+              <span style={{ color: "#C6A66B" }}>{formatMoney(basketTotal, currency, locale)}</span>
+              <span className="opacity-60">→</span>
             </span>
           </button>
         </div>
       )}
 
-      {/* Basket dialog */}
+      {/* Order review dialog */}
       <Dialog open={basketOpen} onOpenChange={setBasketOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: SERIF, color: "#173C32" }}>
-              {locale === "pt" ? "A sua encomenda" : "Your order"}
+              {locale === "pt" ? "Rever encomenda" : "Review order"}
             </DialogTitle>
             <DialogDescription>
-              {locale === "pt" ? "Reveja e confirme a sua pré-encomenda" : "Review and confirm your pre-order"}
+              {locale === "pt" ? "Confirme os itens antes de enviar à cozinha." : "Confirm items before sending to the kitchen."}
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-80 space-y-2 overflow-y-auto py-2">
+
+          {/* Line items */}
+          <div className="max-h-72 space-y-2 overflow-y-auto py-1">
             {basket.map((item) => (
-              <div key={item.productId} className="flex items-center gap-2 rounded-lg border border-[#173C32]/10 p-2.5">
+              <div key={item.productId} className="flex items-center gap-3 rounded-xl border border-[#173C32]/8 p-2.5">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#F7F3EA]">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center" style={{ background: "#173C32" }}>
+                      <span className="text-xs font-medium" style={{ color: "#C6A66B" }}>M</span>
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium" style={{ color: "#173C32" }}>{item.name}</div>
                   <div className="text-xs text-[#173C32]/50 tabular">{formatMoney(item.priceMinor, currency, locale)}</div>
                 </div>
+                {/* Inline quantity selector */}
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="outline" className="h-7 w-7 border-[#173C32]/20 p-0" onClick={() => changeQty(item.productId, -1)}>
+                  <button
+                    type="button"
+                    onClick={() => dec(item.productId)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-[#173C32]/20 text-[#173C32] transition-colors hover:bg-[#173C32]/5"
+                    aria-label="Diminuir"
+                  >
                     <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="w-6 text-center text-sm font-medium tabular">{item.quantity}</span>
-                  <Button size="sm" variant="outline" className="h-7 w-7 border-[#173C32]/20 p-0" onClick={() => changeQty(item.productId, 1)}>
+                  </button>
+                  <span className="w-7 text-center text-sm font-semibold tabular" style={{ color: "#173C32" }}>{item.quantity}</span>
+                  <button
+                    type="button"
+                    onClick={() => inc(item.productId)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-[#173C32]/20 text-[#173C32] transition-colors hover:bg-[#173C32]/5"
+                    aria-label="Aumentar"
+                  >
                     <Plus className="h-3 w-3" />
-                  </Button>
+                  </button>
                 </div>
                 <span className="w-20 text-right text-sm font-semibold tabular" style={{ color: "#173C32" }}>
                   {formatMoney(item.quantity * item.priceMinor, currency, locale)}
                 </span>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-[#173C32]/40" onClick={() => changeQty(item.productId, -item.quantity)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
               </div>
             ))}
           </div>
-          <div className="flex justify-between border-t border-[#173C32]/10 pt-3 text-base font-semibold" style={{ color: "#173C32" }}>
-            <span style={{ fontFamily: SERIF }}>{locale === "pt" ? "Total" : "Total"}</span>
-            <span className="tabular" style={{ color: "#C6A66B" }}>{formatMoney(basketTotal, currency, locale)}</span>
+
+          {/* Special instructions */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium" style={{ color: "#173C32" }}>
+              {locale === "pt" ? "Instruções especiais / alergias" : "Special instructions / allergies"}
+            </label>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={locale === "pt" ? "Ex: sem piri-piri, alergia a frutos secos..." : "E.g. no peri-peri, nut allergy..."}
+              maxLength={500}
+              className="border-[#173C32]/15"
+            />
           </div>
+
+          {/* Totals */}
+          <div className="space-y-1 border-t border-[#173C32]/10 pt-3">
+            <div className="flex justify-between text-sm text-[#173C32]/70">
+              <span>{locale === "pt" ? "Subtotal" : "Subtotal"}</span>
+              <span className="tabular">{formatMoney(basketTotal, currency, locale)}</span>
+            </div>
+            <div className="flex justify-between text-base font-semibold" style={{ color: "#173C32" }}>
+              <span style={{ fontFamily: SERIF }}>{locale === "pt" ? "Total" : "Total"}</span>
+              <span className="tabular" style={{ color: "#C6A66B" }}>{formatMoney(basketTotal, currency, locale)}</span>
+            </div>
+            <p className="pt-1 text-[11px] text-[#173C32]/40">
+              {locale === "pt"
+                ? "O pagamento é separado — será efectuado no restaurante ou via QR da mesa."
+                : "Payment is separate — settled at the restaurant or via the table QR."}
+            </p>
+          </div>
+
           <DialogFooter>
             <Button variant="outline" className="border-[#173C32]/30 text-[#173C32]" onClick={() => setBasketOpen(false)}>
-              {locale === "pt" ? "Continuar" : "Continue"}
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              {locale === "pt" ? "Editar pedido" : "Edit order"}
             </Button>
-            <Button onClick={submitOrder} disabled={submitting} className="text-white" style={{ background: "#173C32" }}>
+            <Button onClick={submitOrder} disabled={submitting || basket.length === 0} className="text-white" style={{ background: "#173C32" }}>
               {submitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
               {locale === "pt" ? "Confirmar encomenda" : "Confirm order"}
             </Button>
@@ -313,14 +386,19 @@ function DishCard({
   product: p,
   currency,
   locale,
-  onAdd,
+  qty,
+  onInc,
+  onDec,
 }: {
   product: MenuProduct;
   currency: string;
   locale: "pt" | "en";
-  onAdd: () => void;
+  qty: number;
+  onInc: () => void;
+  onDec: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
+  const selected = qty > 0;
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-[#173C32]/8 bg-white shadow-sm transition-shadow hover:shadow-md">
       {/* Image */}
@@ -343,6 +421,11 @@ function DishCard({
             {locale === "pt" ? "Assinatura" : "Signature"}
           </div>
         )}
+        {selected && (
+          <div className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold tabular text-white shadow-sm" style={{ background: "#173C32" }}>
+            {qty}
+          </div>
+        )}
       </div>
       {/* Content */}
       <div className="flex flex-1 flex-col p-4">
@@ -363,15 +446,40 @@ function DishCard({
           <span className="text-base font-semibold tabular" style={{ color: "#C6A66B" }}>
             {formatMoney(p.priceMinor, currency, locale)}
           </span>
-          <Button
-            size="sm"
-            onClick={onAdd}
-            className="h-9 w-9 rounded-full p-0 text-white transition-transform hover:scale-105"
-            style={{ background: "#173C32" }}
-            aria-label={`Adicionar ${p.name}`}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+          {/* Quantity selector: + Add when unselected, − N + when selected */}
+          {selected ? (
+            <div className="flex items-center gap-1.5 rounded-full border border-[#173C32]/20 p-1">
+              <button
+                type="button"
+                onClick={onDec}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[#173C32] transition-colors hover:bg-[#173C32]/10"
+                aria-label="Diminuir quantidade"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="w-6 text-center text-base font-semibold tabular" style={{ color: "#173C32" }}>{qty}</span>
+              <button
+                type="button"
+                onClick={onInc}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-transform hover:scale-105"
+                style={{ background: "#173C32" }}
+                aria-label="Aumentar quantidade"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onInc}
+              className="flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-white transition-transform hover:scale-105"
+              style={{ background: "#173C32" }}
+              aria-label={`Adicionar ${p.name}`}
+            >
+              <Plus className="h-4 w-4" />
+              {locale === "pt" ? "Adicionar" : "Add"}
+            </button>
+          )}
         </div>
       </div>
     </article>

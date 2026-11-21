@@ -210,19 +210,46 @@ export function GuestMenuView({
             {locale === "pt" ? "Sem resultados." : "No results."}
           </p>
         ) : (
-          filtered.map((p) => (
-            <div key={p.id} className="flex items-start gap-3 rounded-xl border border-border/60 bg-card p-3">
-              {p.imageUrl && <img src={p.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />}
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{p.name}</div>
-                {p.description && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{p.description}</div>}
-                <div className="mt-1 text-sm font-semibold tabular">{formatMoney(p.priceMinor, currency, locale)}</div>
+          filtered.map((p) => {
+            const qty = basket.find((i) => i.productId === p.id)?.quantity ?? 0;
+            const selected = qty > 0;
+            return (
+              <div key={p.id} className={`flex items-start gap-3 rounded-xl border p-3 transition-colors ${selected ? "border-primary/40 bg-primary/5" : "border-border/60 bg-card"}`}>
+                {p.imageUrl && <img src={p.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />}
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">{p.name}</div>
+                  {p.description && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{p.description}</div>}
+                  <div className="mt-1 text-sm font-semibold tabular">{formatMoney(p.priceMinor, currency, locale)}</div>
+                </div>
+                {/* Live quantity selector — immediate visible confirmation */}
+                {selected ? (
+                  <div className="flex shrink-0 items-center gap-1 rounded-full border border-primary/30 p-1">
+                    <button
+                      type="button"
+                      onClick={() => changeQty(p.id, -1)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+                      aria-label="Diminuir"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="w-6 text-center text-sm font-semibold tabular">{qty}</span>
+                    <button
+                      type="button"
+                      onClick={() => addToBasket(p)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
+                      aria-label="Aumentar"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" className="shrink-0" onClick={() => addToBasket(p)}>
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
-              <Button size="sm" variant="outline" className="shrink-0" onClick={() => addToBasket(p)}>
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

@@ -16,12 +16,12 @@ export default async function Home() {
   // Unauthenticated → sign-in gate.
   if (!session?.user?.id) {
     return (
-      <main className="flex min-h-screen flex-col bg-background">
+      <main className="theme-light flex min-h-screen flex-col bg-[#F7F3EA]">
         <div className="flex flex-1 items-center justify-center p-4">
           <SignInForm />
         </div>
-        <footer className="border-t p-4 text-center text-xs text-muted-foreground">
-          ROHI — Pagamento QR para restaurantes · Moçambique
+        <footer className="border-t border-[#173C32]/10 p-4 text-center text-xs text-[#173C32]/50">
+          MARÉA — Coastal Dining, Maputo · Technology by ROHI
         </footer>
       </main>
     );

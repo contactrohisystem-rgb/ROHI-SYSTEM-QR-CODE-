@@ -206,6 +206,9 @@ export function CheckoutPanel({
                 {t("demo")}
               </Badge>
             </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t("methodsNote")}
+            </p>
             <div className="space-y-1.5">
               <Label htmlFor="phone" className="text-xs">
                 {t("phone")}
