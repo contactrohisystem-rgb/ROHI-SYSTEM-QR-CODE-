@@ -55,20 +55,29 @@ export function isMpesaConfigured(): boolean {
 }
 
 /**
- * Generate the M-Pesa Bearer token. The token is a JWT-like string signed with
- * the API key using the public key (RSA). In production this uses the
- * `jsonwebtoken` library with RS256. We build it lazily so the dependency is
- * only required when M-Pesa is actually configured.
+ * Generate the M-Pesa Bearer token (Vodacom Moçambique C2B API).
+ *
+ * The token is a JWT signed with RS256 using the public key provided by the
+ * M-Pesa developer portal. The payload's `iss` (issuer) claim is the API key.
+ * `jsonwebtoken` adds `iat` and `exp` automatically — do not set them manually
+ * (a manual `iat` can conflict with the library's own timestamp).
+ *
+ * The public key must be PEM-formatted (the portal provides a DER certificate
+ * that must be converted: `openssl x509 -inform DER -in api.cer -pubkey
+ * -noout > public_key.pem`). The lazy `import("jsonwebtoken")` keeps the
+ * Node-only dependency out of the Edge Runtime bundle — this function only
+ * runs inside API routes (Node runtime) when M-Pesa is configured.
+ *
+ * Secrets are never logged: the token, API key, and public key are used only
+ * for the HTTP Authorization header and never persisted to the database.
  */
 async function getBearerToken(config: MpesaConfig): Promise<string> {
-  // Lazy-load jsonwebtoken only when M-Pesa is configured.
   const jwt = await import("jsonwebtoken");
   const token = jwt.sign(
-    { iss: config.spCode, iat: Math.floor(Date.now() / 1000) },
+    { iss: config.apiKey },
     config.publicKey,
-    { algorithm: "RS256" },
+    { algorithm: "RS256", expiresIn: "5m" },
   );
-  // Vodacom expects: Bearer <jwt>
   return `Bearer ${token}`;
 }
 
