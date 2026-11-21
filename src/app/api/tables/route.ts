@@ -13,14 +13,24 @@ const createSchema = z.object({
   posY: z.number().min(0).max(100).optional(),
 });
 
-// GET /api/tables — list tables for the active restaurant (MANAGER+).
+// GET /api/tables — list tables for the active restaurant (SERVER+).
+// Returns label/area/seats/status — needed by servers managing reservations
+// and the floor. Table tokens are NOT returned here (token exposure is limited
+// to the QR generation flow on the server).
 export async function GET() {
-  const auth = await requireStaffRole("MANAGER");
+  const auth = await requireStaffRole("SERVER");
   if (!auth.ok) return auth.response;
 
   const tables = await db.restaurantTable.findMany({
     where: { restaurantId: auth.ctx.restaurantId },
     orderBy: [{ area: "asc" }, { label: "asc" }],
+    select: {
+      id: true,
+      label: true,
+      area: true,
+      seats: true,
+      status: true,
+    },
   });
 
   return NextResponse.json({ tables });

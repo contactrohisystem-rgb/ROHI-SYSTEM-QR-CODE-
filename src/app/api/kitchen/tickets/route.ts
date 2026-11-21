@@ -15,7 +15,7 @@ export async function GET() {
   const orders = await db.customerOrder.findMany({
     where: {
       restaurantId: auth.ctx.restaurantId,
-      status: { in: ["ACCEPTED", "PREPARING"] },
+      status: { in: ["ACCEPTED", "PREPARING", "READY"] },
     },
     orderBy: { createdAt: "asc" },
     include: {
@@ -26,6 +26,28 @@ export async function GET() {
     },
   });
 
+  // Resolve each item's kitchen-station routing via its productId. Items with
+  // no productId (deleted product) or a null station go to the default queue.
+  const productIds = orders.flatMap((o) =>
+    o.items.map((i) => i.productId).filter((id): id is string => !!id),
+  );
+  const products = productIds.length
+    ? await db.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, kitchenStationId: true },
+      })
+    : [];
+  const stationByProduct = new Map(
+    products.map((p) => [p.id, p.kitchenStationId]),
+  );
+  const ordersWithStation = orders.map((o) => ({
+    ...o,
+    items: o.items.map((i) => ({
+      ...i,
+      kitchenStationId: i.productId ? stationByProduct.get(i.productId) ?? null : null,
+    })),
+  }));
+
   // Also fetch stations for filtering
   const stations = await db.kitchenStation.findMany({
     where: { restaurantId: auth.ctx.restaurantId },
@@ -33,7 +55,7 @@ export async function GET() {
     select: { id: true, name: true },
   });
 
-  return NextResponse.json({ orders, stations });
+  return NextResponse.json({ orders: ordersWithStation, stations });
 }
 
 /**

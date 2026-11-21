@@ -11,6 +11,8 @@ const schema = z.object({
   imageUrl: z.string().url().nullable().optional(),
   available: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  // Kitchen station routing. null = default queue (no station).
+  kitchenStationId: z.string().nullable().optional(),
 });
 
 async function getOwned(id: string, restaurantId: string) {
@@ -33,6 +35,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "invalid_price" }, { status: 400 });
     data.priceMinor = priceMinor;
     delete data.price;
+  }
+  // If a kitchen station is being assigned, validate ownership.
+  if (parsed.data.kitchenStationId !== undefined) {
+    const stationId = parsed.data.kitchenStationId;
+    if (stationId !== null) {
+      const station = await db.kitchenStation.findFirst({
+        where: { id: stationId, restaurantId: auth.ctx.restaurantId },
+        select: { id: true },
+      });
+      if (!station)
+        return NextResponse.json({ error: "invalid_station" }, { status: 400 });
+    }
   }
   const updated = await db.product.update({ where: { id }, data });
   return NextResponse.json({ product: updated });

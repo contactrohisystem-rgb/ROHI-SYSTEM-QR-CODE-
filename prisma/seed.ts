@@ -434,25 +434,184 @@ async function main() {
   // --- Demo menu for Restaurant 1 ---
   await db.product.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
   await db.menuCategory.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
+  await db.kitchenStation.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
   const cats1: Record<string, string> = {};
   for (const [i, name] of ["Entradas", "Pratos Principais", "Bebidas", "Sobremesas"].entries()) {
     const c = await db.menuCategory.create({ data: { restaurantId: RESTAURANT_ID, name, sortOrder: i } });
     cats1[name] = c.id;
   }
+  // Kitchen stations for restaurant 1 (Stage 12 — product-to-station routing).
+  const stationMap1: Record<string, string> = {};
+  for (const [i, name] of ["Cozinha Principal", "Grelha", "Bar", "Sobremesas"].entries()) {
+    const s = await db.kitchenStation.create({ data: { restaurantId: RESTAURANT_ID, name, sortOrder: i } });
+    stationMap1[name] = s.id;
+  }
   const products1 = [
-    ["Entradas", "Cambarito Grelhado", "Lulas grelhadas com molho de alho", 18000],
-    ["Entradas", "Lulas Fritas", "Lulas fritas com molho tartaro", 15000],
-    ["Pratos Principais", "Frango Grelhado", "Frango grelhado com arroz e salada", 25000],
-    ["Pratos Principais", "Peixe Grelhado", "Peixe fresco do dia grelhado", 30000],
-    ["Pratos Principais", "Camarao Tigre", "Camarao tigre grelhado com manteiga de alho", 45000],
-    ["Bebidas", "Cerveja 2M", "Cerveja local gelada", 7500],
-    ["Bebidas", "Refri", "Bebida gelada", 4000],
-    ["Bebidas", "Vinho Tinto (copo)", "Vinho tinto da casa", 12000],
-    ["Sobremesas", "Bolo de Chocolate", "Bolo caseiro de chocolate", 12000],
-    ["Sobremesas", "Gelado", "Gelado artesanal", 9000],
+    ["Entradas", "Cambarito Grelhado", "Lulas grelhadas com molho de alho", 18000, "Grelha"],
+    ["Entradas", "Lulas Fritas", "Lulas fritas com molho tartaro", 15000, "Cozinha Principal"],
+    ["Pratos Principais", "Frango Grelhado", "Frango grelhado com arroz e salada", 25000, "Grelha"],
+    ["Pratos Principais", "Peixe Grelhado", "Peixe fresco do dia grelhado", 30000, "Grelha"],
+    ["Pratos Principais", "Camarao Tigre", "Camarao tigre grelhado com manteiga de alho", 45000, "Cozinha Principal"],
+    ["Bebidas", "Cerveja 2M", "Cerveja local gelada", 7500, "Bar"],
+    ["Bebidas", "Refri", "Bebida gelada", 4000, "Bar"],
+    ["Bebidas", "Vinho Tinto (copo)", "Vinho tinto da casa", 12000, "Bar"],
+    ["Sobremesas", "Bolo de Chocolate", "Bolo caseiro de chocolate", 12000, "Sobremesas"],
+    ["Sobremesas", "Gelado", "Gelado artesanal", 9000, "Sobremesas"],
   ] as const;
-  for (const [cat, name, desc, price] of products1) {
-    await db.product.create({ data: { restaurantId: RESTAURANT_ID, categoryId: cats1[cat], name, description: desc, priceMinor: price } });
+  const productIdByName = new Map<string, string>();
+  for (const [cat, name, desc, price, station] of products1) {
+    const p = await db.product.create({
+      data: {
+        restaurantId: RESTAURANT_ID,
+        categoryId: cats1[cat],
+        name,
+        description: desc,
+        priceMinor: price,
+        kitchenStationId: stationMap1[station] ?? null,
+      },
+    });
+    productIdByName.set(name, p.id);
+  }
+
+  // --- Demo customer order in PREPARING (feeds the KDS with active tickets) ---
+  await db.customerOrderItem.deleteMany({
+    where: { order: { restaurantId: RESTAURANT_ID } },
+  });
+  await db.customerOrder.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
+  const demoOrderTableId = tableMap.get("Mesa 4")!;
+  const demoOrder = await db.customerOrder.create({
+    data: {
+      restaurantId: RESTAURANT_ID,
+      tableId: demoOrderTableId,
+      status: "PREPARING",
+      notes: "Sem cebola no frango",
+      createdAt: new Date(Date.now() - 6 * 60 * 1000),
+    },
+  });
+  // Items with mixed prep statuses (some NEW, some PREPARING, one READY).
+  for (const [name, qty, prep] of [
+    ["Frango Grelhado", 2, "PREPARING"],
+    ["Cerveja 2M", 2, "READY"],
+    ["Camarao Tigre", 1, "NEW"],
+  ] as const) {
+    const pid = productIdByName.get(name);
+    const product = pid ? await db.product.findUnique({ where: { id: pid }, select: { priceMinor: true } }) : null;
+    await db.customerOrderItem.create({
+      data: {
+        orderId: demoOrder.id,
+        productId: pid ?? null,
+        name,
+        quantity: qty,
+        unitPriceMinor: product?.priceMinor ?? 0,
+        prepStatus: prep,
+      },
+    });
+  }
+  // A second demo order, ACCEPTED, all items NEW (waiting to start).
+  const demoOrder2 = await db.customerOrder.create({
+    data: {
+      restaurantId: RESTAURANT_ID,
+      tableId: tableMap.get("Mesa 1")!,
+      status: "ACCEPTED",
+      createdAt: new Date(Date.now() - 90 * 1000),
+    },
+  });
+  for (const [name, qty] of [["Cambarito Grelhado", 1], ["Vinho Tinto (copo)", 2]] as const) {
+    const pid = productIdByName.get(name);
+    const product = pid ? await db.product.findUnique({ where: { id: pid }, select: { priceMinor: true } }) : null;
+    await db.customerOrderItem.create({
+      data: {
+        orderId: demoOrder2.id,
+        productId: pid ?? null,
+        name,
+        quantity: qty,
+        unitPriceMinor: product?.priceMinor ?? 0,
+        prepStatus: "NEW",
+      },
+    });
+  }
+
+  // --- Demo reservations (Stage 12) ---
+  await db.reservation.deleteMany({ where: { restaurantId: RESTAURANT_ID } });
+  const inTwoHours = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  const inOneHour = new Date(Date.now() + 1 * 60 * 60 * 1000);
+  const tomorrowEvening = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  tomorrowEvening.setHours(20, 0, 0, 0);
+  await db.reservation.create({
+    data: {
+      restaurantId: RESTAURANT_ID,
+      tableId: tableMap.get("Mesa 7"),
+      customerName: "Ana Macuácua",
+      phone: "+258841234567",
+      partySize: 6,
+      date: inOneHour,
+      durationMins: 120,
+      areaPreference: "VIP",
+      notes: "Aniversário — bolo no fim",
+      status: "CONFIRMED",
+    },
+  });
+  await db.reservation.create({
+    data: {
+      restaurantId: RESTAURANT_ID,
+      customerName: "João Tamele",
+      phone: "+258842345678",
+      partySize: 2,
+      date: inTwoHours,
+      durationMins: 90,
+      areaPreference: "Terraço",
+      status: "PENDING",
+    },
+  });
+  await db.reservation.create({
+    data: {
+      restaurantId: RESTAURANT_ID,
+      customerName: "Família Cossa",
+      phone: "+258843456789",
+      partySize: 4,
+      date: tomorrowEvening,
+      durationMins: 120,
+      notes: "Mesa junto à janela se possível",
+      status: "PENDING",
+    },
+  });
+
+  // --- Demo menu for Restaurant 2 (café) + a kitchen station ---
+  await db.product.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  await db.menuCategory.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  await db.kitchenStation.deleteMany({ where: { restaurantId: RESTAURANT_2_ID } });
+  const r2Station = await db.kitchenStation.create({ data: { restaurantId: RESTAURANT_2_ID, name: "Café", sortOrder: 0 } });
+  const cats2: Record<string, string> = {};
+  for (const [i, name] of ["Bebidas", "Padaria"].entries()) {
+    const c = await db.menuCategory.create({ data: { restaurantId: RESTAURANT_2_ID, name, sortOrder: i } });
+    cats2[name] = c.id;
+  }
+  for (const [cat, name, desc, price] of [
+    ["Bebidas", "Café", "Café expresso", 4000],
+    ["Bebidas", "Cappuccino", "Cappuccino cremoso", 6000],
+    ["Padaria", "Croissant", "Croissant de manteiga", 7000],
+    ["Padaria", "Pão de Queijo", "Pão de queijo brasileiro", 5000],
+  ] as const) {
+    await db.product.create({ data: { restaurantId: RESTAURANT_2_ID, categoryId: cats2[cat], name, description: desc, priceMinor: price, kitchenStationId: r2Station.id } });
+  }
+
+  // --- Demo menu for Restaurant 3 (bar) + a kitchen station ---
+  await db.product.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  await db.menuCategory.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  await db.kitchenStation.deleteMany({ where: { restaurantId: RESTAURANT_3_ID } });
+  const r3Station = await db.kitchenStation.create({ data: { restaurantId: RESTAURANT_3_ID, name: "Bar", sortOrder: 0 } });
+  const cats3: Record<string, string> = {};
+  for (const [i, name] of ["Cocktails", "Petiscos"].entries()) {
+    const c = await db.menuCategory.create({ data: { restaurantId: RESTAURANT_3_ID, name, sortOrder: i } });
+    cats3[name] = c.id;
+  }
+  for (const [cat, name, desc, price] of [
+    ["Cocktails", "Caipirinha", "Caipirinha tradicional", 12000],
+    ["Cocktails", "Mojito", "Mojito de hortelã", 13000],
+    ["Petiscos", "Amendoins", "Amendoins torrados", 3500],
+    ["Petiscos", "Lulas à Bulhão Pato", "Lulas com alho e coentros", 9000],
+  ] as const) {
+    await db.product.create({ data: { restaurantId: RESTAURANT_3_ID, categoryId: cats3[cat], name, description: desc, priceMinor: price, kitchenStationId: r3Station.id } });
   }
 
   console.log("ROHI seed complete.");

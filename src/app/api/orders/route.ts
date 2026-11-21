@@ -42,7 +42,8 @@ export async function GET(req: Request) {
 }
 
 const submitSchema = z.object({
-  tableToken: z.string().min(1),
+  tableToken: z.string().min(1).optional(),
+  tableId: z.string().min(1).optional(),
   items: z.array(
     z.object({
       productId: z.string(),
@@ -54,9 +55,12 @@ const submitSchema = z.object({
 });
 
 /**
- * POST /api/orders — guest submits an order (token-gated).
- * Creates a CustomerOrder (SUBMITTED) + CustomerOrderItems with price
- * snapshots from the DB (never trusts client-supplied prices).
+ * POST /api/orders — submit an order.
+ * Two modes:
+ *   Guest: { tableToken, items } — token-gated, no auth. Creates SUBMITTED.
+ *   Staff: { tableId, items } — SERVER+, resolves the table from the caller's
+ *          restaurant. Creates ACCEPTED (staff already confirmed with the
+ *          customer) so the ticket goes straight to the KDS.
  */
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -64,15 +68,40 @@ export async function POST(req: Request) {
   if (!parsed.success)
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
 
-  const { tableToken, items, notes } = parsed.data;
-  const table = await db.restaurantTable.findUnique({
-    where: { token: tableToken },
-    include: { restaurant: { select: { id: true, status: true } } },
-  });
-  if (!table || table.restaurant.status !== "active")
-    return NextResponse.json({ error: "invalid_table" }, { status: 404 });
+  const { tableToken, tableId, items, notes } = parsed.data;
 
-  const restaurantId = table.restaurant.id;
+  let restaurantId: string;
+  let resolvedTableId: string;
+  let initialStatus: string;
+
+  if (tableToken) {
+    // Guest mode
+    const table = await db.restaurantTable.findUnique({
+      where: { token: tableToken },
+      include: { restaurant: { select: { id: true, status: true } } },
+    });
+    if (!table || table.restaurant.status !== "active")
+      return NextResponse.json({ error: "invalid_table" }, { status: 404 });
+    restaurantId = table.restaurant.id;
+    resolvedTableId = table.id;
+    initialStatus = "SUBMITTED";
+  } else if (tableId) {
+    // Staff mode
+    const { requireStaffRole } = await import("@/lib/auth/session");
+    const auth = await requireStaffRole("SERVER");
+    if (!auth.ok) return auth.response;
+    const table = await db.restaurantTable.findFirst({
+      where: { id: tableId, restaurantId: auth.ctx.restaurantId },
+      select: { id: true },
+    });
+    if (!table)
+      return NextResponse.json({ error: "invalid_table" }, { status: 404 });
+    restaurantId = auth.ctx.restaurantId;
+    resolvedTableId = table.id;
+    initialStatus = "ACCEPTED";
+  } else {
+    return NextResponse.json({ error: "missing_table_reference" }, { status: 400 });
+  }
 
   // Fetch products from DB (validate availability + snapshot prices server-side)
   const productIds = items.map((i) => i.productId);
@@ -87,8 +116,8 @@ export async function POST(req: Request) {
     const created = await tx.customerOrder.create({
       data: {
         restaurantId,
-        tableId: table.id,
-        status: "SUBMITTED",
+        tableId: resolvedTableId,
+        status: initialStatus,
         notes: notes ?? null,
       },
     });

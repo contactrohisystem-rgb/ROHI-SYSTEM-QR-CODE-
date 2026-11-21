@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/money";
 import { CheckoutPanel } from "@/components/payments/checkout-panel";
 import { GuestMenuView } from "@/components/payments/guest-menu-view";
 import { GuestOrderTracking, DigitalReceipt } from "@/components/payments/guest-extras";
+import { GuestReservationForm } from "@/components/payments/guest-reservation-form";
 import { brandCssVars } from "@/lib/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -38,6 +39,7 @@ export default async function PayPage({
   const messages = await getMessages();
   const { table: token, tab } = await searchParams;
   const showMenu = tab === "menu";
+  const showReserve = tab === "reserve";
 
   const table = token
     ? await db.restaurantTable.findUnique({
@@ -58,6 +60,18 @@ export default async function PayPage({
     : null;
 
   const invalid = !table || table.restaurant.status !== "active";
+
+  // Distinct area names for the reservation area-preference dropdown.
+  const areaOptions: string[] =
+    table && !invalid
+      ? await db.area
+          .findMany({
+            where: { floorPlan: { restaurantId: table.restaurant.id } },
+            orderBy: { sortOrder: "asc" },
+            select: { name: true },
+          })
+          .then((rows) => rows.map((r) => r.name))
+      : [];
 
   const activeBill =
     table && !invalid ? await getActiveBillForTable(table.id) : null;
@@ -157,13 +171,13 @@ export default async function PayPage({
               </div>
             </div>
 
-            {/* Tab bar: Bill | Menu */}
+            {/* Tab bar: Bill | Menu | Reserve */}
             {table && (
               <div className="flex gap-2">
                 <a
                   href={`/pay?table=${encodeURIComponent(token!)}`}
                   className={`flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
-                    !showMenu
+                    !showMenu && !showReserve
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground"
                   }`}
@@ -180,11 +194,31 @@ export default async function PayPage({
                 >
                   {locale === "pt" ? "Menu" : "Menu"}
                 </a>
+                <a
+                  href={`/pay?table=${encodeURIComponent(token!)}&tab=reserve`}
+                  className={`flex-1 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
+                    showReserve
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {locale === "pt" ? "Reservar" : "Reserve"}
+                </a>
               </div>
             )}
 
-            {/* Menu tab */}
-            {showMenu && table ? (
+            {/* Reserve tab */}
+            {showReserve && table ? (
+              <div className="theme-light">
+                <NextIntlClientProvider locale={locale} messages={messages}>
+                  <GuestReservationForm
+                    tableToken={token!}
+                    locale={moneyLocale as "pt" | "en"}
+                    areaOptions={areaOptions}
+                  />
+                </NextIntlClientProvider>
+              </div>
+            ) : showMenu && table ? (
               <GuestMenuView
                 tableToken={token!}
                 currency={table.restaurant.brandPrimary ? "MZN" : "MZN"}

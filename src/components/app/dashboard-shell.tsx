@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  CalendarClock,
   CreditCard,
   LayoutDashboard,
   Map,
@@ -26,6 +27,7 @@ import { PaymentsSection, type TransactionView } from "@/components/payments/pay
 import { SettingsSection } from "@/components/settings/settings-section";
 import { MenuSection } from "@/components/menu/menu-section";
 import { OrdersSection } from "@/components/orders/orders-section";
+import { ReservationsSection } from "@/components/reservations/reservations-section";
 import { BrandTheme } from "@/components/app/brand-theme";
 import { RestaurantSwitcher } from "@/components/app/restaurant-switcher";
 import type { RestaurantBrand } from "@/lib/brand";
@@ -44,6 +46,7 @@ type SectionId =
   | "billing"
   | "menu"
   | "orders"
+  | "reservations"
   | "payments"
   | "pos"
   | "settings";
@@ -61,7 +64,8 @@ const NAV: NavItem[] = [
   { id: "tables", label: "Tables & QR", icon: Table2, stage: "4" },
   { id: "billing", label: "Billing", icon: Receipt, stage: "5" },
   { id: "menu", label: "Menu", icon: Utensils, stage: "11" },
-  { id: "orders", label: "Orders", icon: Package, stage: "11" },
+  { id: "orders", label: "Orders", icon: Package, stage: "12" },
+  { id: "reservations", label: "Reservations", icon: CalendarClock, stage: "12" },
   { id: "payments", label: "Payments", icon: CreditCard, stage: "6" },
   { id: "pos", label: "POS Sync", icon: Plug, stage: "8" },
   { id: "settings", label: "Settings", icon: Settings, stage: "10" },
@@ -72,8 +76,9 @@ const SECTION_TITLES: Record<SectionId, { title: string; subtitle: string }> = {
   "floor-plan": { title: "Floor Plan", subtitle: "Interactive restaurant layout" },
   tables: { title: "Tables & QR", subtitle: "Manage tables and QR codes" },
   billing: { title: "Billing", subtitle: "Open bills and lightweight POS" },
-  menu: { title: "Menu", subtitle: "Categories and products" },
-  orders: { title: "Orders", subtitle: "QR customer orders" },
+  menu: { title: "Menu", subtitle: "Categories, products and kitchen stations" },
+  orders: { title: "Orders", subtitle: "QR + staff-created orders" },
+  reservations: { title: "Reservations", subtitle: "Manage table reservations" },
   payments: { title: "Payments", subtitle: "Transaction history and status" },
   pos: { title: "POS Synchronisation", subtitle: "POS connection and sync records" },
   settings: { title: "Settings", subtitle: "Restaurant, staff and configuration" },
@@ -289,6 +294,7 @@ export function DashboardShell({
             )}
             {active === "menu" && <MenuSection />}
             {active === "orders" && <OrdersSection />}
+            {active === "reservations" && <ReservationsSection />}
             {active === "payments" && (
               <PaymentsSection transactions={transactions} />
             )}
