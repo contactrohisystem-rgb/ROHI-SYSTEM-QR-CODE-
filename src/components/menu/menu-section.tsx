@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Pencil, Plus, Trash2, Utensils, Flame } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, Utensils, Flame, ChevronUp, ChevronDown } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -234,9 +234,28 @@ export function MenuSection() {
   async function deleteStation(id: string) {
     const res = await fetch(`/api/kitchen/stations/${id}`, { method: "DELETE" });
     if (res.ok) {
-      toast({ title: "Estação eliminada", description: "Produtos voltaram à fila padrão." });
+      toast({ title: "Estação eliminada", description: "Produtos voltaram à fila padrão. Histórico de pedidos não é afectado." });
       await load();
     }
+  }
+
+  // Stage 12E: reorder stations (swap sortOrder with neighbour, then reload).
+  async function moveStation(id: string, dir: -1 | 1) {
+    const sorted = [...stations].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((s) => s.id === id);
+    const swapWith = sorted[idx + dir];
+    if (!swapWith) return;
+    await Promise.all([
+      fetch(`/api/kitchen/stations/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: swapWith.sortOrder }),
+      }),
+      fetch(`/api/kitchen/stations/${swapWith.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sortOrder: sorted[idx].sortOrder }),
+      }),
+    ]);
+    await loadStations();
   }
 
   const stationNameById = new Map(stations.map((s) => [s.id, s.name]));
@@ -290,7 +309,7 @@ export function MenuSection() {
               </p>
             ) : (
               <div className="divide-y divide-border/60">
-                {stations.map((s) => (
+                {stations.map((s, i) => (
                   <div key={s.id} className="flex items-center gap-2 py-2">
                     {editingStationId === s.id ? (
                       <>
@@ -305,15 +324,23 @@ export function MenuSection() {
                       </>
                     ) : (
                       <>
+                        <div className="flex flex-col">
+                          <Button variant="ghost" className="h-4 w-5 p-0 text-muted-foreground hover:text-primary disabled:opacity-30" onClick={() => moveStation(s.id, -1)} disabled={i === 0} aria-label="Mover para cima">
+                            <ChevronUp className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" className="h-4 w-5 p-0 text-muted-foreground hover:text-primary disabled:opacity-30" onClick={() => moveStation(s.id, 1)} disabled={i === stations.length - 1} aria-label="Mover para baixo">
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </div>
                         <Flame className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="flex-1 text-sm font-medium">{s.name}</span>
                         <Badge variant="outline" className="text-[10px]">{s.productCount} produto{s.productCount === 1 ? "" : "s"}</Badge>
-                        <Button size="ghost" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => { setEditingStationId(s.id); setEditingStationName(s.name); }}>
+                        <Button variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => { setEditingStationId(s.id); setEditingStationName(s.name); }}>
                           <Pencil className="h-3 w-3" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="ghost" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                            <Button variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
@@ -392,10 +419,10 @@ export function MenuSection() {
                         <Badge variant={p.available ? "secondary" : "outline"} className="cursor-pointer text-[10px]" onClick={() => toggleAvailable(p)}>
                           {p.available ? "Disponível" : "Indisp."}
                         </Badge>
-                        <Button size="ghost" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => openEditProduct(p)}>
+                        <Button variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={() => openEditProduct(p)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button size="ghost" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => deleteProduct(p.id)}>
+                        <Button variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => deleteProduct(p.id)}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>

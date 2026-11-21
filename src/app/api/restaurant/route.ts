@@ -15,9 +15,20 @@ const patchSchema = z.object({
   brandSecondary: z.string().regex(HEX).nullable().optional(),
   brandAccent: z.string().regex(HEX).nullable().optional(),
   appearance: z.enum(["dark", "light"]).optional(),
+  // Stage 13G: reservation policy fields.
+  description: z.string().max(1000).nullable().optional(),
+  reservationsEnabled: z.boolean().optional(),
+  openingHours: z.string().max(2000).nullable().optional(),
+  defaultReservationDurationMins: z.number().int().min(30).max(240).optional(),
+  minNoticeMins: z.number().int().min(0).max(10080).optional(),
+  maxAdvanceDays: z.number().int().min(1).max(365).optional(),
+  maxPartySize: z.number().int().min(1).max(50).optional(),
+  reservationApprovalMode: z.enum(["STAFF", "AUTO"]).optional(),
+  reservationCancellationPolicy: z.string().max(500).nullable().optional(),
 });
 
-// GET /api/restaurant — the active restaurant's profile + branding (MANAGER+).
+// GET /api/restaurant — the active restaurant's profile + branding + reservation
+// policy (MANAGER+).
 export async function GET() {
   const auth = await requireStaffRole("MANAGER");
   if (!auth.ok) return auth.response;
@@ -37,6 +48,16 @@ export async function GET() {
       brandSecondary: true,
       brandAccent: true,
       appearance: true,
+      slug: true,
+      description: true,
+      reservationsEnabled: true,
+      openingHours: true,
+      defaultReservationDurationMins: true,
+      minNoticeMins: true,
+      maxAdvanceDays: true,
+      maxPartySize: true,
+      reservationApprovalMode: true,
+      reservationCancellationPolicy: true,
     },
   });
   if (!restaurant) {

@@ -34,6 +34,13 @@ declare module "next-auth" {
       memberships?: MembershipView[];
     };
   }
+  // trustHost is a valid NextAuth v4 runtime option (used behind reverse
+  // proxies / gateways) but is missing from the installed version's AuthOptions
+  // type. Augment it here rather than casting, so the rest of the config stays
+  // fully type-checked.
+  interface AuthOptions {
+    trustHost?: boolean;
+  }
 }
 
 declare module "next-auth/jwt" {

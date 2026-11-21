@@ -19,34 +19,23 @@ export async function GET() {
     },
     orderBy: { createdAt: "asc" },
     include: {
+      // Stage 12D: kitchenStationId is snapshotted on each item at order
+      // creation time, so routing is stable regardless of later product/station
+      // changes. No live product join needed.
       items: {
         orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          quantity: true,
+          notes: true,
+          prepStatus: true,
+          kitchenStationId: true,
+        },
       },
       table: { select: { label: true } },
     },
   });
-
-  // Resolve each item's kitchen-station routing via its productId. Items with
-  // no productId (deleted product) or a null station go to the default queue.
-  const productIds = orders.flatMap((o) =>
-    o.items.map((i) => i.productId).filter((id): id is string => !!id),
-  );
-  const products = productIds.length
-    ? await db.product.findMany({
-        where: { id: { in: productIds } },
-        select: { id: true, kitchenStationId: true },
-      })
-    : [];
-  const stationByProduct = new Map(
-    products.map((p) => [p.id, p.kitchenStationId]),
-  );
-  const ordersWithStation = orders.map((o) => ({
-    ...o,
-    items: o.items.map((i) => ({
-      ...i,
-      kitchenStationId: i.productId ? stationByProduct.get(i.productId) ?? null : null,
-    })),
-  }));
 
   // Also fetch stations for filtering
   const stations = await db.kitchenStation.findMany({
@@ -55,7 +44,7 @@ export async function GET() {
     select: { id: true, name: true },
   });
 
-  return NextResponse.json({ orders: ordersWithStation, stations });
+  return NextResponse.json({ orders, stations });
 }
 
 /**

@@ -21,6 +21,8 @@ import {
   Wallet,
   CheckCircle2,
   XCircle,
+  CalendarClock,
+  Users,
 } from "lucide-react";
 
 import { KpiCard } from "./kpi-card";
@@ -42,6 +44,10 @@ export interface DashboardStats {
   openBills: number;
   pendingOrders: number;
   activeOrders: number;
+  // Stage 13E: front-of-house reservation summary for today.
+  todayReservations: number;
+  pendingReservations: number;
+  seatedGuests: number;
   revenueSeries: { day: string; revenueMinor: number }[];
   methodBreakdown: {
     method: string;
@@ -182,6 +188,20 @@ export function DashboardSection({
           hint="Em preparação / prontos"
         />
         <KpiCard
+          label="Reservas hoje"
+          value={String(stats.todayReservations)}
+          icon={CalendarClock}
+          tone="primary"
+          hint={`${stats.pendingReservations} pendente${stats.pendingReservations === 1 ? "" : "s"}`}
+        />
+        <KpiCard
+          label="Clientes sentados"
+          value={String(stats.seatedGuests)}
+          icon={Users}
+          tone="amber"
+          hint="Em serviço agora"
+        />
+        <KpiCard
           label="Transacções"
           value={String(stats.succeededCount)}
           icon={CheckCircle2}
@@ -283,7 +303,7 @@ export function DashboardSection({
                               </span>
                               <span className="ml-2 tabular text-muted-foreground">
                                 {formatMoney(
-                                  Math.round(payload[0].value * 100),
+                                  Math.round(Number(payload[0].value ?? 0) * 100),
                                   cur,
                                   "pt",
                                 )}

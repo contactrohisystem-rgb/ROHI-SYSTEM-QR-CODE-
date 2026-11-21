@@ -57,9 +57,26 @@ function daysAgoDate(n: number, hour = 13): Date {
 
 async function main() {
   // --- Restaurant + users (upsert) ---
+  // Stage 13: backfill slug, description, opening hours + reservation policy
+  // on every seed run so existing rows pick up the new fields.
+  const R1_OPENING_HOURS = JSON.stringify({
+    mon: { open: "11:00", close: "23:00" },
+    tue: { open: "11:00", close: "23:00" },
+    wed: { open: "11:00", close: "23:00" },
+    thu: { open: "11:00", close: "23:00" },
+    fri: { open: "11:00", close: "23:59" },
+    sat: { open: "11:00", close: "23:59" },
+    sun: { open: "12:00", close: "22:00" },
+  });
   const restaurant = await db.restaurant.upsert({
     where: { id: RESTAURANT_ID },
-    update: {},
+    update: {
+      slug: "demo-maputo",
+      description: "Cozinha moçambicana de autor em Maputo. Peixe fresco do dia, marisco grelhado e vinhos seleccionados.",
+      openingHours: R1_OPENING_HOURS,
+      reservationsEnabled: true,
+      reservationApprovalMode: "STAFF",
+    },
     create: {
       id: RESTAURANT_ID,
       name: "Restaurante Demo Maputo",
@@ -68,6 +85,11 @@ async function main() {
       locale: "pt-MZ",
       timezone: "Africa/Maputo",
       status: "active",
+      slug: "demo-maputo",
+      description: "Cozinha moçambicana de autor em Maputo. Peixe fresco do dia, marisco grelhado e vinhos seleccionados.",
+      openingHours: R1_OPENING_HOURS,
+      reservationsEnabled: true,
+      reservationApprovalMode: "STAFF",
     },
   });
 
@@ -278,9 +300,24 @@ async function main() {
 
   // --- Second demo restaurant (different branding) for multi-restaurant demo ---
   const RESTAURANT_2_ID = "cafe-costa-do-sol";
+  const R2_OPENING_HOURS = JSON.stringify({
+    mon: { open: "07:00", close: "20:00" },
+    tue: { open: "07:00", close: "20:00" },
+    wed: { open: "07:00", close: "20:00" },
+    thu: { open: "07:00", close: "20:00" },
+    fri: { open: "07:00", close: "22:00" },
+    sat: { open: "08:00", close: "22:00" },
+    sun: { open: "08:00", close: "18:00" },
+  });
   const r2 = await db.restaurant.upsert({
     where: { id: RESTAURANT_2_ID },
-    update: {},
+    update: {
+      slug: "cafe-costa-do-sol",
+      description: "Café e padaria à beira-mar. Pequenos-almoços, croissants frescos e café expresso.",
+      openingHours: R2_OPENING_HOURS,
+      reservationsEnabled: true,
+      reservationApprovalMode: "AUTO",
+    },
     create: {
       id: RESTAURANT_2_ID,
       name: "Café Costa do Sol",
@@ -291,6 +328,11 @@ async function main() {
       status: "active",
       phone: "+258 841234567",
       address: "Av. Marginal, Maputo",
+      slug: "cafe-costa-do-sol",
+      description: "Café e padaria à beira-mar. Pequenos-almoços, croissants frescos e café expresso.",
+      openingHours: R2_OPENING_HOURS,
+      reservationsEnabled: true,
+      reservationApprovalMode: "AUTO",
       // Different branding: warm orange primary, light staff appearance, a logo.
       brandPrimary: "#ea580c",
       brandSecondary: "#f59e0b",
@@ -369,9 +411,24 @@ async function main() {
 
   // --- Third demo restaurant (bar/lounge) ---
   const RESTAURANT_3_ID = "skybar-maputo";
+  const R3_OPENING_HOURS = JSON.stringify({
+    mon: null,
+    tue: { open: "18:00", close: "02:00" },
+    wed: { open: "18:00", close: "02:00" },
+    thu: { open: "18:00", close: "02:00" },
+    fri: { open: "18:00", close: "03:00" },
+    sat: { open: "18:00", close: "03:00" },
+    sun: { open: "18:00", close: "01:00" },
+  });
   const r3 = await db.restaurant.upsert({
     where: { id: RESTAURANT_3_ID },
-    update: {},
+    update: {
+      slug: "skybar-maputo",
+      description: "Skybar rooftop lounge com vista panorâmica. Cocktails de assinatura, petiscos e ambiente nocturno.",
+      openingHours: R3_OPENING_HOURS,
+      reservationsEnabled: true,
+      reservationApprovalMode: "STAFF",
+    },
     create: {
       id: RESTAURANT_3_ID,
       name: "Skybar Maputo",
@@ -381,6 +438,11 @@ async function main() {
       status: "active",
       phone: "+258 841234999",
       address: "Av. 24 de Julho, Maputo",
+      slug: "skybar-maputo",
+      description: "Skybar rooftop lounge com vista panorâmica. Cocktails de assinatura, petiscos e ambiente nocturno.",
+      openingHours: R3_OPENING_HOURS,
+      reservationsEnabled: true,
+      reservationApprovalMode: "STAFF",
       brandPrimary: "#7c3aed",
       brandSecondary: "#a78bfa",
       brandAccent: "#06b6d4",
@@ -495,7 +557,7 @@ async function main() {
     ["Camarao Tigre", 1, "NEW"],
   ] as const) {
     const pid = productIdByName.get(name);
-    const product = pid ? await db.product.findUnique({ where: { id: pid }, select: { priceMinor: true } }) : null;
+    const product = pid ? await db.product.findUnique({ where: { id: pid }, select: { priceMinor: true, kitchenStationId: true } }) : null;
     await db.customerOrderItem.create({
       data: {
         orderId: demoOrder.id,
@@ -504,6 +566,7 @@ async function main() {
         quantity: qty,
         unitPriceMinor: product?.priceMinor ?? 0,
         prepStatus: prep,
+        kitchenStationId: product?.kitchenStationId ?? null,
       },
     });
   }
@@ -518,7 +581,7 @@ async function main() {
   });
   for (const [name, qty] of [["Cambarito Grelhado", 1], ["Vinho Tinto (copo)", 2]] as const) {
     const pid = productIdByName.get(name);
-    const product = pid ? await db.product.findUnique({ where: { id: pid }, select: { priceMinor: true } }) : null;
+    const product = pid ? await db.product.findUnique({ where: { id: pid }, select: { priceMinor: true, kitchenStationId: true } }) : null;
     await db.customerOrderItem.create({
       data: {
         orderId: demoOrder2.id,
@@ -527,6 +590,7 @@ async function main() {
         quantity: qty,
         unitPriceMinor: product?.priceMinor ?? 0,
         prepStatus: "NEW",
+        kitchenStationId: product?.kitchenStationId ?? null,
       },
     });
   }
@@ -549,6 +613,7 @@ async function main() {
       areaPreference: "VIP",
       notes: "Aniversário — bolo no fim",
       status: "CONFIRMED",
+      reference: "RSV-ANA7VQ",
     },
   });
   await db.reservation.create({
@@ -561,6 +626,7 @@ async function main() {
       durationMins: 90,
       areaPreference: "Terraço",
       status: "PENDING",
+      reference: "RSV-JTA2K9",
     },
   });
   await db.reservation.create({
@@ -573,6 +639,7 @@ async function main() {
       durationMins: 120,
       notes: "Mesa junto à janela se possível",
       status: "PENDING",
+      reference: "RSV-FCO4M7",
     },
   });
 

@@ -8,11 +8,33 @@ const schema = z.object({
 });
 
 /**
+ * Allowed kitchen preparation status transitions (forward-only).
+ * NEW → PREPARING → READY → COMPLETED. COMPLETED is terminal.
+ * This is intentionally stricter than the order-level status: an item cannot
+ * go backwards (e.g. READY → NEW) once progressed, preventing inconsistent KDS
+ * state from concurrent or mistaken taps.
+ */
+const PREP_TRANSITIONS: Record<string, Set<string>> = {
+  NEW: new Set(["PREPARING"]),
+  PREPARING: new Set(["READY"]),
+  READY: new Set(["COMPLETED"]),
+  COMPLETED: new Set([]),
+};
+
+function isPrepTransitionAllowed(from: string, to: string): boolean {
+  return PREP_TRANSITIONS[from]?.has(to) ?? false;
+}
+
+/**
  * PATCH /api/kitchen/items/[id] — update an order item's kitchen preparation
  * status (NEW → PREPARING → READY → COMPLETED). SERVER+.
  *
- * When all items in an order reach READY or COMPLETED, the order status is
- * automatically updated to READY (notifying service staff).
+ * Stage 12D hardening:
+ *   - Validates the prep-status transition is forward-only.
+ *   - The item update + order-status recompute run in one transaction so the
+ *     "order becomes READY only when all items are READY/COMPLETED" invariant
+ *     holds even under concurrent updates.
+ *   - Restaurant membership is enforced via the item's order relation.
  */
 export async function PATCH(
   req: Request,
@@ -28,55 +50,64 @@ export async function PATCH(
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
-  // Find the item, validate it belongs to the caller's restaurant
+  const newStatus = parsed.data.prepStatus;
+
+  // Find the item, validate it belongs to the caller's restaurant.
   const item = await db.customerOrderItem.findFirst({
-    where: {
-      id,
-      order: { restaurantId: auth.ctx.restaurantId },
-    },
-    include: {
-      order: {
-        select: { id: true, status: true, restaurantId: true },
-      },
-    },
+    where: { id, order: { restaurantId: auth.ctx.restaurantId } },
+    include: { order: { select: { id: true, status: true, restaurantId: true } } },
   });
   if (!item) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  // Update the item's prep status
-  await db.customerOrderItem.update({
-    where: { id },
-    data: { prepStatus: parsed.data.prepStatus },
-  });
+  // Validate the transition.
+  if (item.prepStatus === newStatus) {
+    // Idempotent: already at the requested status.
+    return NextResponse.json({ ok: true, prepStatus: newStatus, unchanged: true });
+  }
+  if (!isPrepTransitionAllowed(item.prepStatus, newStatus)) {
+    return NextResponse.json(
+      { error: "invalid_prep_transition", from: item.prepStatus, to: newStatus },
+      { status: 400 },
+    );
+  }
 
-  // Check if all items in the order are READY or COMPLETED
-  const allItems = await db.customerOrderItem.findMany({
-    where: { orderId: item.order.id },
-    select: { prepStatus: true },
-  });
-  const allReady = allItems.every(
-    (i) => i.prepStatus === "READY" || i.prepStatus === "COMPLETED",
-  );
+  // Transactional update + order-status recompute.
+  const result = await db.$transaction(async (tx) => {
+    await tx.customerOrderItem.update({
+      where: { id },
+      data: { prepStatus: newStatus },
+    });
 
-  // If all ready and the order is ACCEPTED/PREPARING, update to READY
-  if (allReady && allItems.length > 0) {
-    if (item.order.status === "ACCEPTED" || item.order.status === "PREPARING") {
-      await db.customerOrder.update({
+    const allItems = await tx.customerOrderItem.findMany({
+      where: { orderId: item.order.id },
+      select: { prepStatus: true },
+    });
+    const allReadyOrCompleted = allItems.length > 0 && allItems.every(
+      (i) => i.prepStatus === "READY" || i.prepStatus === "COMPLETED",
+    );
+    const anyPreparing = allItems.some((i) => i.prepStatus === "PREPARING");
+
+    // Order-level status invariants:
+    //  - all items READY/COMPLETED → order READY (if currently ACCEPTED/PREPARING)
+    //  - any item PREPARING and order still ACCEPTED → order PREPARING
+    //  - never move the order backwards from READY here
+    const orderStatus = item.order.status;
+    if (allReadyOrCompleted && (orderStatus === "ACCEPTED" || orderStatus === "PREPARING")) {
+      await tx.customerOrder.update({
         where: { id: item.order.id },
         data: { status: "READY" },
       });
-    }
-  } else if (!allReady && item.order.status === "ACCEPTED") {
-    // At least one item started preparing → order to PREPARING
-    const anyPreparing = allItems.some((i) => i.prepStatus === "PREPARING");
-    if (anyPreparing) {
-      await db.customerOrder.update({
+    } else if (!allReadyOrCompleted && anyPreparing && orderStatus === "ACCEPTED") {
+      await tx.customerOrder.update({
         where: { id: item.order.id },
         data: { status: "PREPARING" },
       });
     }
-  }
 
-  return NextResponse.json({ ok: true, prepStatus: parsed.data.prepStatus });
+    return { ok: true as const, prepStatus: newStatus };
+  });
+
+  return NextResponse.json(result);
 }

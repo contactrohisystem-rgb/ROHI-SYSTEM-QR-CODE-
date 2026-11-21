@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireStaffRole } from "@/lib/auth/session";
+import {
+  findTableConflicts,
+  isTransitionAllowed,
+  reservationWindow,
+  windowsOverlap,
+} from "@/lib/reservations";
 
 const VALID_STATUSES = [
   "PENDING",
@@ -16,20 +22,26 @@ const patchSchema = z.object({
   status: z.enum(VALID_STATUSES).optional(),
   tableId: z.string().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  // Optional: staff proposes an alternative time (reschedule). Shifts the
+  // reservation date + duration and returns to PENDING for guest re-confirm.
+  newDate: z.string().optional(),
+  newDurationMins: z.number().int().min(30).max(240).optional(),
 });
 
 /**
- * PATCH /api/reservations/[id] — staff updates a reservation's status and/or
- * assigns a table. SERVER+.
+ * PATCH /api/reservations/[id] — staff updates a reservation.
  *
- * Status machine (staff-driven):
- *   PENDING → CONFIRMED (assign table) → SEATED → COMPLETED
- *   PENDING/CONFIRMED → CANCELLED
- *   SEATED → NO_SHOW (optional)
- *
- * When SEATED, the assigned table's status is set to RESERVED (if a table is
- * linked). When COMPLETED/CANCELLED/NO_SHOW, the table is freed back to
- * AVAILABLE (only if currently RESERVED by this reservation).
+ * Stage 12C hardening:
+ *   - Status transitions are validated against the allowed state machine.
+ *   - Table assignment is transactional and checks BOTH capacity (seats >=
+ *     partySize) AND overlapping reservations on the same table.
+ *   - A table currently OCCUPIED by an active dining bill cannot be set to
+ *     RESERVED by a seating action unless staff explicitly chooses it — the
+ *     reservation's table status side-effect is skipped if the table has an
+ *     OPEN/PENDING_PAYMENT bill (the live dining session wins).
+ *   - When SEATED, the table is marked RESERVED; on COMPLETED/CANCELLED/NO_SHOW
+ *     the table is freed to AVAILABLE only if it has no active dining bill and
+ *     is currently RESERVED.
  */
 export async function PATCH(
   req: Request,
@@ -41,7 +53,7 @@ export async function PATCH(
 
   const reservation = await db.reservation.findFirst({
     where: { id, restaurantId: auth.ctx.restaurantId },
-    include: { table: { select: { id: true, label: true, status: true } } },
+    include: { table: { select: { id: true, label: true, seats: true, status: true } } },
   });
   if (!reservation)
     return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -51,60 +63,135 @@ export async function PATCH(
   if (!parsed.success)
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
 
-  const { status, tableId, notes } = parsed.data;
+  const { status, tableId, notes, newDate, newDurationMins } = parsed.data;
 
-  // If a table is being assigned, validate ownership.
+  // Validate status transition (Stage 12A).
+  if (status && !isTransitionAllowed(reservation.status, status)) {
+    return NextResponse.json(
+      { error: "invalid_transition", from: reservation.status, to: status },
+      { status: 400 },
+    );
+  }
+
+  // Reschedule (staff proposes alternative time).
+  let resolvedDate = reservation.date;
+  let resolvedDuration = reservation.durationMins;
+  if (newDate) {
+    const d = new Date(newDate);
+    if (Number.isNaN(d.getTime()))
+      return NextResponse.json({ error: "invalid_date" }, { status: 400 });
+    resolvedDate = d;
+    if (newDurationMins) resolvedDuration = newDurationMins;
+  }
+
+  // Resolve the target table.
   let resolvedTableId = tableId !== undefined ? tableId : reservation.tableId;
-  if (resolvedTableId !== null) {
+
+  // Confirming/Seating requires a table.
+  if ((status === "CONFIRMED" || status === "SEATED") && resolvedTableId === null) {
+    return NextResponse.json({ error: "table_required" }, { status: 400 });
+  }
+
+  // Validate table ownership + capacity + conflicts (transactional).
+  if (resolvedTableId !== null && resolvedTableId !== undefined) {
     const table = await db.restaurantTable.findFirst({
       where: { id: resolvedTableId, restaurantId: auth.ctx.restaurantId },
-      select: { id: true, label: true, status: true },
+      select: { id: true, label: true, seats: true, status: true },
     });
     if (!table)
       return NextResponse.json({ error: "invalid_table" }, { status: 400 });
-  }
-
-  // Confirming/Seating requires a table.
-  if (status === "CONFIRMED" || status === "SEATED") {
-    if (resolvedTableId === null)
+    if (table.seats < reservation.partySize)
       return NextResponse.json(
-        { error: "table_required" },
+        { error: "capacity_exceeded", message: `Table seats ${table.seats}, party is ${reservation.partySize}.` },
         { status: 400 },
       );
   }
 
-  const updated = await db.reservation.update({
-    where: { id },
-    data: {
-      ...(status ? { status } : {}),
-      ...(tableId !== undefined ? { tableId: resolvedTableId } : {}),
-      ...(notes !== undefined ? { notes } : {}),
-    },
-    include: { table: { select: { id: true, label: true } } },
-  });
+  const window = reservationWindow(resolvedDate, resolvedDuration);
 
-  // Side-effect on the linked table's status.
-  const linkedTableId = resolvedTableId;
-  if (linkedTableId) {
-    if (status === "SEATED") {
-      await db.restaurantTable.update({
-        where: { id: linkedTableId },
-        data: { status: "RESERVED" },
-      });
-    } else if (status === "COMPLETED" || status === "CANCELLED" || status === "NO_SHOW") {
-      // Free the table if it's currently RESERVED.
-      const t = await db.restaurantTable.findUnique({
-        where: { id: linkedTableId },
-        select: { status: true },
-      });
-      if (t?.status === "RESERVED") {
-        await db.restaurantTable.update({
-          where: { id: linkedTableId },
-          data: { status: "AVAILABLE" },
+  // Run the update + conflict re-check + table-status side-effect atomically.
+  try {
+    const updated = await db.$transaction(async (tx) => {
+      // Re-check table conflict inside the transaction (concurrent-safe).
+      if (resolvedTableId) {
+        const conflicts = await tx.reservation.findMany({
+          where: {
+            restaurantId: auth.ctx.restaurantId,
+            tableId: resolvedTableId,
+            status: { in: ["PENDING", "CONFIRMED", "SEATED"] },
+            id: { not: reservation.id },
+            date: { lt: window.end },
+          },
+          select: { date: true, durationMins: true },
         });
+        const hasConflict = conflicts.some((c) => {
+          const cWindow = reservationWindow(c.date, c.durationMins);
+          return windowsOverlap(window, cWindow);
+        });
+        if (hasConflict) {
+          throw new Error("table_conflict");
+        }
       }
-    }
-  }
 
-  return NextResponse.json({ reservation: updated });
+      const result = await tx.reservation.update({
+        where: { id: reservation.id },
+        data: {
+          ...(status ? { status } : {}),
+          ...(tableId !== undefined ? { tableId: resolvedTableId } : {}),
+          ...(notes !== undefined ? { notes } : {}),
+          ...(newDate ? { date: resolvedDate } : {}),
+          ...(newDurationMins ? { durationMins: resolvedDuration } : {}),
+        },
+        include: { table: { select: { id: true, label: true, area: true, seats: true } } },
+      });
+
+      // Table-status side-effects (Stage 12C). A table with an active dining
+      // bill keeps its OCCUPIED status — the live session wins over the
+      // reservation's RESERVED flag.
+      const linkedTableId = resolvedTableId;
+      if (linkedTableId) {
+        const table = await tx.restaurantTable.findUnique({
+          where: { id: linkedTableId },
+          select: { id: true, status: true },
+        });
+        if (table) {
+          const hasActiveBill = await tx.bill.findFirst({
+            where: { tableId: linkedTableId, status: { in: ["OPEN", "PENDING_PAYMENT"] } },
+            select: { id: true },
+          });
+          if (status === "SEATED" && !hasActiveBill && table.status === "AVAILABLE") {
+            await tx.restaurantTable.update({
+              where: { id: linkedTableId },
+              data: { status: "RESERVED" },
+            });
+          } else if (status === "COMPLETED" || status === "CANCELLED" || status === "NO_SHOW") {
+            // Free the table only if currently RESERVED (not OCCUPIED by a bill).
+            if (table.status === "RESERVED") {
+              await tx.restaurantTable.update({
+                where: { id: linkedTableId },
+                data: { status: "AVAILABLE" },
+              });
+            }
+          }
+        }
+      }
+
+      return result;
+    });
+    return NextResponse.json({ reservation: updated });
+  } catch (err) {
+    const e = err as Error;
+    if (e.message === "table_conflict") {
+      return NextResponse.json(
+        { error: "table_conflict", message: "This table is already reserved for an overlapping time." },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
 }
+
+/**
+ * DELETE is intentionally not exposed — cancellation is a status transition
+ * (PATCH status=CANCELLED), preserving the audit trail.
+ */

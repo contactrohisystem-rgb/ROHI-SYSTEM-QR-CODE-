@@ -107,11 +107,14 @@ export async function POST(req: Request) {
   const productIds = items.map((i) => i.productId);
   const products = await db.product.findMany({
     where: { id: { in: productIds }, restaurantId, available: true },
+    select: { id: true, name: true, priceMinor: true, kitchenStationId: true },
   });
   if (products.length !== productIds.length)
     return NextResponse.json({ error: "product_unavailable" }, { status: 400 });
 
-  // Create the order + items in a transaction
+  // Create the order + items in a transaction. Stage 12D: snapshot the product's
+  // kitchenStationId onto each item so KDS routing is preserved even if the
+  // product's station is later changed or the product/station is deleted.
   const order = await db.$transaction(async (tx) => {
     const created = await tx.customerOrder.create({
       data: {
@@ -131,6 +134,7 @@ export async function POST(req: Request) {
           quantity: item.quantity,
           unitPriceMinor: product.priceMinor,
           notes: item.notes ?? null,
+          kitchenStationId: product.kitchenStationId,
         },
       });
     }

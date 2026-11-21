@@ -170,6 +170,27 @@ model Restaurant {
   brandAccent   String?
   appearance    String   @default("dark") // dark | light (staff dashboard)
 
+  // Public booking identity (Stage 13). Opaque, URL-safe, unique per
+  // restaurant. Used by /r/[slug] public booking pages. Distinct from table QR
+  // tokens (which are per-table payment credentials). Nullable until first set;
+  // seeded for existing restaurants. Uniqueness is enforced in application
+  // code (generation + collision retry) to keep schema migrations additive.
+  slug           String? @unique
+  description    String? // public marketing copy for the booking page
+
+  // Reservation policy (Stage 13G). Safe defaults preserve existing behaviour.
+  // openingHours is a JSON-encoded weekly schedule, e.g.
+  //   {"mon":{"open":"18:00","close":"23:00"},"tue":null,...}
+  // null day = closed. Empty/missing = always-available (legacy behaviour).
+  reservationsEnabled         Boolean @default(true)
+  openingHours                String?
+  defaultReservationDurationMins Int  @default(90)
+  minNoticeMins               Int    @default(120) // minimum advance booking
+  maxAdvanceDays              Int    @default(60)  // maximum advance booking
+  maxPartySize                Int    @default(12)
+  reservationApprovalMode     String @default("STAFF") // STAFF | AUTO
+  reservationCancellationPolicy String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -376,6 +397,10 @@ model CustomerOrderItem {
   notes           String?
   // Kitchen preparation status (item-level): NEW → PREPARING → READY → COMPLETED
   prepStatus      String   @default("NEW")
+  // Stage 12D: snapshot of the product's kitchen station routing at order
+  // creation time. Preserves KDS routing even if the product's station is
+  // later changed or the product/station deleted. Null = default queue.
+  kitchenStationId String?
   createdAt       DateTime @default(now())
 
   order CustomerOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -417,6 +442,10 @@ model Reservation {
   areaPreference String? // "Indoor", "Terrace", etc.
   notes        String?
   status       String   @default("PENDING") // PENDING | CONFIRMED | SEATED | COMPLETED | CANCELLED | NO_SHOW
+  // Stage 13A: human-readable booking reference shown to the guest and used to
+  // look up a reservation status without auth. Uniqueness enforced in app code
+  // (high-entropy generation + retry). Indexed for fast lookups.
+  reference    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -425,6 +454,7 @@ model Reservation {
 
   @@index([restaurantId, date])
   @@index([restaurantId, status])
+  @@index([reference])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
