@@ -45,6 +45,9 @@ export default async function Home() {
     openBills: 0,
     pendingOrders: 0,
     activeOrders: 0,
+    todayReservations: 0,
+    pendingReservations: 0,
+    seatedGuests: 0,
     revenueSeries: [],
     methodBreakdown: [],
     recentTransactions: [],
@@ -212,6 +215,25 @@ export default async function Home() {
       where: { restaurantId, status: { in: ["ACCEPTED", "PREPARING", "READY"] } },
     });
 
+    // Stage 13E: today's reservations summary for the front-of-house overview.
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date();
+    dayEnd.setHours(23, 59, 59, 999);
+    const todayReservations = await db.reservation.count({
+      where: {
+        restaurantId,
+        date: { gte: dayStart, lte: dayEnd },
+        status: { notIn: ["CANCELLED", "NO_SHOW"] },
+      },
+    });
+    const pendingReservations = await db.reservation.count({
+      where: { restaurantId, status: "PENDING" },
+    });
+    const seatedGuests = await db.reservation.count({
+      where: { restaurantId, status: "SEATED" },
+    });
+
     stats = {
       currency,
       totalRevenueMinor,
@@ -224,6 +246,9 @@ export default async function Home() {
       openBills,
       pendingOrders,
       activeOrders,
+      todayReservations,
+      pendingReservations,
+      seatedGuests,
       revenueSeries,
       methodBreakdown,
       recentTransactions,

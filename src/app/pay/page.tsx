@@ -80,7 +80,7 @@ export default async function PayPage({
     id: string;
     totalMinor: number;
     currency: string;
-    closedAt: Date;
+    closedAt: Date | null;
   } | null = null;
   if (table && !invalid && !activeBill) {
     recentPaidBill = await db.bill.findFirst({

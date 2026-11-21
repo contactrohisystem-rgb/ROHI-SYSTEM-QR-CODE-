@@ -33,6 +33,17 @@ interface Profile {
   brandSecondary: string | null;
   brandAccent: string | null;
   appearance: string;
+  // Stage 13G: reservation policy
+  slug: string | null;
+  description: string | null;
+  reservationsEnabled: boolean;
+  openingHours: string | null;
+  defaultReservationDurationMins: number;
+  minNoticeMins: number;
+  maxAdvanceDays: number;
+  maxPartySize: number;
+  reservationApprovalMode: string;
+  reservationCancellationPolicy: string | null;
 }
 
 function ColorField({
@@ -101,6 +112,15 @@ export function SettingsSection() {
           brandSecondary: profile.brandSecondary || null,
           brandAccent: profile.brandAccent || null,
           appearance: profile.appearance,
+          description: profile.description || null,
+          reservationsEnabled: profile.reservationsEnabled,
+          openingHours: profile.openingHours || null,
+          defaultReservationDurationMins: profile.defaultReservationDurationMins,
+          minNoticeMins: profile.minNoticeMins,
+          maxAdvanceDays: profile.maxAdvanceDays,
+          maxPartySize: profile.maxPartySize,
+          reservationApprovalMode: profile.reservationApprovalMode,
+          reservationCancellationPolicy: profile.reservationCancellationPolicy || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -302,6 +322,109 @@ export function SettingsSection() {
                 <SelectItem value="light">Claro</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reservation policy (Stage 13G) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Reservas
+          </CardTitle>
+          <CardDescription>
+            Política de reservas e página pública de reservas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {profile.slug && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Link público de reservas</Label>
+              <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
+                <span className="font-mono text-muted-foreground">/r/{profile.slug}</span>
+                <a
+                  href={`/r/${profile.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto text-primary hover:underline"
+                >
+                  Abrir
+                </a>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm">Aceitar reservas online</Label>
+              <p className="text-xs text-muted-foreground">Desactive para pausar as reservas públicas</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={profile.reservationsEnabled}
+              onClick={() => set("reservationsEnabled", !profile.reservationsEnabled)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${profile.reservationsEnabled ? "bg-primary" : "bg-muted"}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-background transition-transform ${profile.reservationsEnabled ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+          <Separator />
+          <div className="space-y-1.5">
+            <Label className="text-xs">Descrição pública</Label>
+            <Input
+              value={profile.description ?? ""}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="Cozinha moçambicana de autor..."
+              maxLength={1000}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Duração padrão (min)</Label>
+              <Input type="number" min={30} max={240} value={profile.defaultReservationDurationMins} onChange={(e) => set("defaultReservationDurationMins", parseInt(e.target.value || "90", 10))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Aviso mínimo (min)</Label>
+              <Input type="number" min={0} value={profile.minNoticeMins} onChange={(e) => set("minNoticeMins", parseInt(e.target.value || "0", 10))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Antecedência máx (dias)</Label>
+              <Input type="number" min={1} value={profile.maxAdvanceDays} onChange={(e) => set("maxAdvanceDays", parseInt(e.target.value || "60", 10))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Grupo máximo</Label>
+              <Input type="number" min={1} value={profile.maxPartySize} onChange={(e) => set("maxPartySize", parseInt(e.target.value || "12", 10))} />
+            </div>
+          </div>
+          <Separator />
+          <div className="space-y-1.5">
+            <Label className="text-xs">Modo de aprovação</Label>
+            <Select
+              value={profile.reservationApprovalMode}
+              onValueChange={(v) => set("reservationApprovalMode", v)}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="STAFF">Confirmação pela equipa</SelectItem>
+                <SelectItem value="AUTO">Confirmação automática</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {profile.reservationApprovalMode === "AUTO"
+                ? "Reservas são confirmadas automaticamente e uma mesa é atribuída."
+                : "Reservas ficam pendentes até a equipa confirmar e atribuir mesa."}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Política de cancelamento</Label>
+            <Input
+              value={profile.reservationCancellationPolicy ?? ""}
+              onChange={(e) => set("reservationCancellationPolicy", e.target.value)}
+              placeholder="Cancelamento gratuito até 2h antes..."
+              maxLength={500}
+            />
           </div>
         </CardContent>
       </Card>
