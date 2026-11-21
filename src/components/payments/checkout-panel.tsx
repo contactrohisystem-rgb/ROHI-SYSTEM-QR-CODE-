@@ -63,7 +63,23 @@ export function CheckoutPanel({
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [methods, setMethods] = useState<{
+    code: string; label: string; description: string; isDemo: boolean; requiresPhone: boolean;
+  }[]>([]);
+  const [selectedMethod, setSelectedMethod] = useState<string>("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch available payment methods (only configured/operational ones appear).
+  useEffect(() => {
+    fetch("/api/payments/methods")
+      .then((r) => r.json())
+      .then((d) => {
+        const ms = d.methods ?? [];
+        setMethods(ms);
+        if (ms.length > 0 && !selectedMethod) setSelectedMethod(ms[0].code);
+      })
+      .catch(() => {});
+  }, []);
 
   function stopPolling() {
     if (pollRef.current) {
@@ -108,7 +124,7 @@ export function CheckoutPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tableToken,
-          providerCode: "MOCK",
+          providerCode: selectedMethod || "MOCK",
           customerIdentifier: phone || undefined,
         }),
       });
@@ -190,51 +206,69 @@ export function CheckoutPanel({
               <ArrowLeft className="mr-1 h-3.5 w-3.5" /> {t("back")}
             </button>
             <p className="text-sm font-medium">{t("chooseMethod")}</p>
-            <div className="flex items-center justify-between rounded-xl border bg-card p-3.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Smartphone className="h-4 w-4 text-primary" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{t("mpesaDemo")}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {t("mpesaDemoNote")}
+            {/* Dynamic method list — only configured/operational methods appear */}
+            {methods.map((m) => {
+              const selected = selectedMethod === m.code;
+              return (
+                <button
+                  key={m.code}
+                  type="button"
+                  onClick={() => setSelectedMethod(m.code)}
+                  className={`flex w-full items-center justify-between rounded-xl border p-3.5 text-left transition-colors ${selected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/30"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                      <Smartphone className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">{m.label}</div>
+                      <div className="text-[11px] text-muted-foreground">{m.description}</div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
-                {t("demo")}
-              </Badge>
-            </div>
+                  {m.isDemo && <Badge variant="secondary" className="text-[10px]">{t("demo")}</Badge>}
+                  {selected && !m.isDemo && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                </button>
+              );
+            })}
+            {methods.length === 0 && (
+              <p className="py-4 text-center text-sm text-muted-foreground">—</p>
+            )}
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               {t("methodsNote")}
             </p>
-            <div className="space-y-1.5">
-              <Label htmlFor="phone" className="text-xs">
-                {t("phone")}
-              </Label>
-              <div className="flex items-center gap-2 rounded-xl border bg-card px-3">
-                <span className="text-sm text-muted-foreground">+258</span>
-                <Input
-                  id="phone"
-                  inputMode="numeric"
-                  placeholder="84XXXXXXX"
-                  value={phone}
-                  onChange={(e) =>
-                    setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))
-                  }
-                  className="h-11 border-0 px-0 text-base shadow-none focus-visible:ring-0"
-                />
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                {t("phoneHint")}
-              </p>
-            </div>
+            {/* Phone field — only for mobile-money methods */}
+            {(() => {
+              const sel = methods.find((m) => m.code === selectedMethod);
+              if (!sel?.requiresPhone) return null;
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="text-xs">
+                    {t("phone")}
+                  </Label>
+                  <div className="flex items-center gap-2 rounded-xl border bg-card px-3">
+                    <span className="text-sm text-muted-foreground">+258</span>
+                    <Input
+                      id="phone"
+                      inputMode="numeric"
+                      placeholder="84XXXXXXX"
+                      value={phone}
+                      onChange={(e) =>
+                        setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))
+                      }
+                      className="h-11 border-0 px-0 text-base shadow-none focus-visible:ring-0"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("phoneHint")}
+                  </p>
+                </div>
+              );
+            })()}
             <Button
               className="w-full"
               size="lg"
               onClick={startPayment}
-              disabled={phone.length !== 9}
+              disabled={!selectedMethod || (methods.find((m) => m.code === selectedMethod)?.requiresPhone && phone.length !== 9)}
             >
               {t("confirm")} {totalFormatted}
             </Button>
@@ -257,18 +291,27 @@ export function CheckoutPanel({
                 {t("awaitingNote")}
               </p>
             </div>
-            <div className="rounded-xl border border-dashed border-border/60 p-3">
-              <p className="mb-2 text-[11px] text-muted-foreground">
-                {t("simulateNote")}
-              </p>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={simulateConfirm}
-              >
-                {t("simulateApproval")}
-              </Button>
-            </div>
+            {/* The simulate-approval button is ONLY shown for the MOCK demo
+                provider. Real providers (M-Pesa, e-Mola, card) confirm via
+                signed webhook — never via a client button. */}
+            {(() => {
+              const sel = methods.find((m) => m.code === selectedMethod);
+              if (!sel?.isDemo) return null;
+              return (
+                <div className="rounded-xl border border-dashed border-border/60 p-3">
+                  <p className="mb-2 text-[11px] text-muted-foreground">
+                    {t("simulateNote")}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={simulateConfirm}
+                  >
+                    {t("simulateApproval")}
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
         )}
 
