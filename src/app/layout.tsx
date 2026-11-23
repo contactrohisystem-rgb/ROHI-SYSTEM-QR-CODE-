@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -13,14 +13,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// MARÉA prototype: elegant editorial serif for restaurant identity + dish titles.
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
+// MARÉA prototype: editorial serif for restaurant identity + dish titles.
+// Uses a system serif font stack (no network dependency at build time).
+// The --font-playfair variable is set in globals.css.
 export const metadata: Metadata = {
   title: "MARÉA — Coastal Dining, Maputo",
   description: "MARÉA — coastal dining in Maputo. The Indian Ocean, served differently.",
@@ -35,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="pt" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         {children}
         <Toaster />
