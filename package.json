@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:seed": "bun run prisma/seed-marea.ts",
-    "db:seed:classic": "bun run prisma/seed.ts"
+    "db:seed:classic": "bun run prisma/seed.ts",
+    "test": "bun test"
   },
   "prisma": {
     "seed": "bun run prisma/seed-marea.ts"

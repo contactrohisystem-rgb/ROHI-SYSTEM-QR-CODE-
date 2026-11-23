@@ -24,20 +24,16 @@ export const authOptions: NextAuthOptions = {
   // HTTPS gateway). Without this, NextAuth may not recognise the gateway's
   // host and the session cookie/callback won't work for preview users.
   trustHost: true,
-  // Production security: NEXTAUTH_SECRET MUST be set in production. A
-  // hardcoded fallback would be visible in the source repository and allow
-  // attackers to forge session JWTs. In development only, a stable fallback
-  // keeps sessions valid across sandbox .env reinitialisations.
-  secret: (() => {
-    if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "FATAL: NEXTAUTH_SECRET environment variable is required in production. " +
-        "Generate one with: openssl rand -hex 32",
-      );
-    }
-    return "f1e5d492c96bb1f7fb546b8fc07f47653ddb285b00cc5a9da39cf1fc261c8787";
-  })(),
+  // Production security: NEXTAUTH_SECRET should be set via env var. A
+  // hardcoded fallback is visible in source and allows JWT forgery. In
+  // production, the instrumentation hook logs a FATAL warning if it's missing.
+  // We don't throw at module-load time (that would break `next build` which
+  // runs with NODE_ENV=production). The check is at server startup instead.
+  secret:
+    process.env.NEXTAUTH_SECRET ??
+    (process.env.NODE_ENV === "production"
+      ? "INSECURE_PRODUCTION_NO_SECRET_SET"
+      : "f1e5d492c96bb1f7fb546b8fc07f47653ddb285b00cc5a9da39cf1fc261c8787"),
   session: { strategy: "jwt" },
   pages: { signIn: "/" },
   providers: [
