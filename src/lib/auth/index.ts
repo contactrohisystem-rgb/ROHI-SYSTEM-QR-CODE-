@@ -24,15 +24,20 @@ export const authOptions: NextAuthOptions = {
   // HTTPS gateway). Without this, NextAuth may not recognise the gateway's
   // host and the session cookie/callback won't work for preview users.
   trustHost: true,
-  // Stable dev fallback secret. The sandbox reinitializes .env on dev server
-  // restarts (wiping NEXTAUTH_SECRET), which caused NextAuth to auto-generate
-  // a NEW secret each restart and invalidate session cookies
-  // ("decryption operation failed"). This constant keeps the dev secret
-  // stable across restarts. In production, set NEXTAUTH_SECRET env var and it
-  // takes precedence — this fallback is never used there.
-  secret:
-    process.env.NEXTAUTH_SECRET ??
-    "f1e5d492c96bb1f7fb546b8fc07f47653ddb285b00cc5a9da39cf1fc261c8787",
+  // Production security: NEXTAUTH_SECRET MUST be set in production. A
+  // hardcoded fallback would be visible in the source repository and allow
+  // attackers to forge session JWTs. In development only, a stable fallback
+  // keeps sessions valid across sandbox .env reinitialisations.
+  secret: (() => {
+    if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "FATAL: NEXTAUTH_SECRET environment variable is required in production. " +
+        "Generate one with: openssl rand -hex 32",
+      );
+    }
+    return "f1e5d492c96bb1f7fb546b8fc07f47653ddb285b00cc5a9da39cf1fc261c8787";
+  })(),
   session: { strategy: "jwt" },
   pages: { signIn: "/" },
   providers: [
